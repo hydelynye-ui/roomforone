@@ -16,6 +16,8 @@ export type ModalType =
   | 'drawing' 
   | 'game' 
   | 'diy' 
+  | 'tangle'
+  | 'headphones'
   | 'atmosphere' 
   | 'mood-ai' 
   | 'about' 
