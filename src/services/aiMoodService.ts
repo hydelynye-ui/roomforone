@@ -10,7 +10,7 @@ import { MoodAIRecommendation, WeatherPreset } from '../types';
  * - 留给房间桌面的温暖便签短句
  */
 export async function analyzeMood(moodText: string): Promise<MoodAIRecommendation> {
-  const text = moodText.trim().toLowerCase();
+  const text = moodText.trim().slice(0, 500).toLowerCase();
 
   // 模拟思考延迟 600ms
   await new Promise((resolve) => setTimeout(resolve, 600));
@@ -79,7 +79,7 @@ export async function analyzeMood(moodText: string): Promise<MoodAIRecommendatio
     roomNote = '「今天也是值得留出属于自己时间的一天。」';
   }
 
-  return {
+  return sanitizeRecommendation({
     weather,
     windowOpen,
     lampOn,
@@ -87,5 +87,22 @@ export async function analyzeMood(moodText: string): Promise<MoodAIRecommendatio
     volumeAmbient,
     reason,
     roomNote,
+  });
+}
+
+/**
+ * Keep the local demo engine on the same constrained contract as a future
+ * server model adapter. This makes invalid model output harmless to the room.
+ */
+function sanitizeRecommendation(value: MoodAIRecommendation): MoodAIRecommendation {
+  const allowedWeather: WeatherPreset[] = ['sunny', 'rain', 'snow', 'autumn', 'night'];
+  return {
+    weather: allowedWeather.includes(value.weather) ? value.weather : 'sunny',
+    windowOpen: Boolean(value.windowOpen),
+    lampOn: Boolean(value.lampOn),
+    volumeWeather: Math.min(1, Math.max(0, Number.isFinite(value.volumeWeather) ? value.volumeWeather : 0.5)),
+    volumeAmbient: Math.min(1, Math.max(0, Number.isFinite(value.volumeAmbient) ? value.volumeAmbient : 0.4)),
+    reason: String(value.reason || '').slice(0, 240),
+    roomNote: String(value.roomNote || '').slice(0, 120),
   };
 }
