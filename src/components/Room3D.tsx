@@ -123,6 +123,8 @@ export const Room3D: React.FC<Room3DProps> = ({
     const matWood = new THREE.MeshStandardMaterial({ color: 0xB58756, roughness: 0.5 });
     const matDarkWood = new THREE.MeshStandardMaterial({ color: 0x825E3B, roughness: 0.5 });
     const matScreen = new THREE.MeshBasicMaterial({ color: 0x22272E });
+    const screenDayMaterial = new THREE.MeshBasicMaterial({ color: 0x24292E });
+    const screenNightMaterial = new THREE.MeshBasicMaterial({ color: 0x60A5FA });
     const matSage = new THREE.MeshStandardMaterial({ color: 0x91A58C, roughness: 0.6 });
     const matTerracotta = new THREE.MeshStandardMaterial({ color: 0xC98464, roughness: 0.5 });
     const matMetal = new THREE.MeshStandardMaterial({ color: 0x4A4E54, metalness: 0.8, roughness: 0.2 });
@@ -267,6 +269,46 @@ export const Room3D: React.FC<Room3DProps> = ({
 
     deskGroup.add(monitorGroup);
     registerInteractive(deskGroup, 'computer');
+
+    // --- Tangle desk object (interactive thinking / note entry) ---
+    // Three low-poly loops make the object recognizable without requiring a texture asset.
+    const tangleGroup = new THREE.Group();
+    tangleGroup.position.set(0.42, 1.25, -1.92);
+    tangleGroup.rotation.set(0.15, -0.2, 0.1);
+    const tangleMaterial = new THREE.MeshStandardMaterial({
+      color: 0xC98464,
+      roughness: 0.35,
+      metalness: 0.1,
+    });
+    const tangleLoop = new THREE.TorusGeometry(0.16, 0.035, 6, 12);
+    const tangleLoopA = new THREE.Mesh(tangleLoop, tangleMaterial);
+    tangleLoopA.rotation.set(0.2, 0.3, 0.2);
+    const tangleLoopB = new THREE.Mesh(tangleLoop, matSage);
+    tangleLoopB.rotation.set(1.1, 0.4, -0.5);
+    const tangleLoopC = new THREE.Mesh(tangleLoop, matTerracotta);
+    tangleLoopC.rotation.set(0.6, 1.2, 0.8);
+    tangleGroup.add(tangleLoopA, tangleLoopB, tangleLoopC);
+    registerInteractive(tangleGroup, 'tangle');
+
+    // --- AirPods Max desk stand (interactive sound entry) ---
+    const headphonesGroup = new THREE.Group();
+    headphonesGroup.position.set(-0.82, 1.28, -1.98);
+    headphonesGroup.rotation.y = -0.25;
+    const headphoneBand = new THREE.Mesh(
+      new THREE.TorusGeometry(0.27, 0.035, 8, 18, Math.PI),
+      matMetal,
+    );
+    headphoneBand.rotation.x = Math.PI / 2;
+    headphoneBand.position.y = 0.18;
+    const earCupLeft = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.08, 12), matMetal);
+    earCupLeft.rotation.z = Math.PI / 2;
+    earCupLeft.position.set(-0.2, 0.04, 0);
+    const earCupRight = earCupLeft.clone();
+    earCupRight.position.x = 0.2;
+    const headphoneStand = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 0.38, 8), matWood);
+    headphoneStand.position.y = -0.08;
+    headphonesGroup.add(headphoneBand, earCupLeft, earCupRight, headphoneStand);
+    registerInteractive(headphonesGroup, 'headphones');
 
     // Desk Chair
     const chairGroup = new THREE.Group();
@@ -444,7 +486,7 @@ export const Room3D: React.FC<Room3DProps> = ({
           sunLight.color.setHex(0xfff3db);
           sunLight.intensity = 1.9;
           sunLight.position.set(-6, 9, -2);
-          monitorScreen.material = new THREE.MeshBasicMaterial({ color: 0x24292E });
+          monitorScreen.material = screenDayMaterial;
           particleMat.opacity = 0; // No rain/snow in sunny
           break;
 
@@ -488,7 +530,7 @@ export const Room3D: React.FC<Room3DProps> = ({
           ambientLight.intensity = 0.45;
           sunLight.color.setHex(0x3B4A6B);
           sunLight.intensity = 0.2;
-          monitorScreen.material = new THREE.MeshBasicMaterial({ color: 0x60A5FA });
+          monitorScreen.material = screenNightMaterial;
           particleMat.opacity = 0;
           break;
       }
@@ -507,8 +549,8 @@ export const Room3D: React.FC<Room3DProps> = ({
       hasMoved = false;
     };
 
-    const minAzimuth = 0.25;  // ~14 deg
-    const maxAzimuth = 1.45;  // ~83 deg (~70 deg total range, centered around 45)
+    const minAzimuth = -0.25; // ~-14 deg
+    const maxAzimuth = 1.85;  // ~106 deg (about 120 deg total safe view)
 
     const onPointerMove = (e: PointerEvent) => {
       const rect = renderer.domElement.getBoundingClientRect();
@@ -593,6 +635,10 @@ export const Room3D: React.FC<Room3DProps> = ({
             stateRef.current.onSelectModal('game');
           } else if (itemName === 'diy') {
             stateRef.current.onSelectModal('diy');
+          } else if (itemName === 'tangle') {
+            stateRef.current.onSelectModal('tangle');
+          } else if (itemName === 'headphones') {
+            stateRef.current.onSelectModal('headphones');
           } else if (itemName === 'atmosphere') {
             stateRef.current.onSelectModal('atmosphere');
           }
@@ -685,6 +731,8 @@ export const Room3D: React.FC<Room3DProps> = ({
             {hoveredItem === 'drawing' && '点击展开 · 涂鸦画板与灵感草稿'}
             {hoveredItem === 'game' && '点击把玩 · 秋日接落叶轻量小游戏'}
             {hoveredItem === 'diy' && '点击翻阅 · 手作与 DIY 记录'}
+            {hoveredItem === 'tangle' && '点击记录 · Tangle 随手灵感'}
+            {hoveredItem === 'headphones' && '点击聆听 · AirPods Max 声音入口'}
             {hoveredItem === 'lamp' && (lampOn ? '点击关闭台灯' : '点击开启暖光台灯')}
             {hoveredItem === 'window' && (windowOpen ? '点击关闭窗户' : '点击打开窗户')}
             {hoveredItem === 'atmosphere' && '点击调节 · 空间氛围与声音'}
