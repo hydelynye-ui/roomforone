@@ -10,6 +10,8 @@ import { DIYModal } from './components/DIYModal';
 import { AtmosphereModal } from './components/AtmosphereModal';
 import { MoodAIModal } from './components/MoodAIModal';
 import { AboutModal } from './components/AboutModal';
+import { TangleModal } from './components/TangleModal';
+import { HeadphonesModal } from './components/HeadphonesModal';
 
 import { WeatherPreset, ModalType, RoomState, MoodAIRecommendation } from './types';
 import { loadRoomState, saveRoomState } from './services/storage';
@@ -156,6 +158,18 @@ export const App: React.FC = () => {
       )}
       {activeModal === 'diy' && (
         <DIYModal onClose={() => setActiveModal(null)} />
+      )}
+      {activeModal === 'tangle' && (
+        <TangleModal onClose={() => setActiveModal(null)} />
+      )}
+      {activeModal === 'headphones' && (
+        <HeadphonesModal
+          roomState={roomState}
+          onToggleMute={handleToggleMute}
+          onUpdateVolume={handleUpdateVolume}
+          onSetWeather={handleSetWeather}
+          onClose={() => setActiveModal(null)}
+        />
       )}
       {activeModal === 'atmosphere' && (
         <AtmosphereModal
