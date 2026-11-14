@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, ArrowUpRight, Compass, Palette, Gamepad2, Hammer } from 'lucide-react';
+import { Sparkles, ArrowUpRight, Compass, Palette, Gamepad2, Hammer, Lightbulb, Headphones } from 'lucide-react';
 import { ModalType } from '../types';
 
 interface BentoCardsProps {
@@ -80,6 +80,20 @@ export const BentoCards: React.FC<BentoCardsProps> = ({
           >
             <Hammer className="w-3.5 h-3.5 text-[#825E3B]" />
             <span>手作记录</span>
+          </button>
+          <button
+            onClick={() => onOpenModal('tangle')}
+            className="flex items-center gap-1.5 p-2 rounded-xl bg-[#EFE8DC]/60 hover:bg-[#EFE8DC] text-[11px] text-[#34312E] font-medium transition-all text-left cursor-pointer"
+          >
+            <Lightbulb className="w-3.5 h-3.5 text-[#C98464]" />
+            <span>随手灵感</span>
+          </button>
+          <button
+            onClick={() => onOpenModal('headphones')}
+            className="flex items-center gap-1.5 p-2 rounded-xl bg-[#EFE8DC]/60 hover:bg-[#EFE8DC] text-[11px] text-[#34312E] font-medium transition-all text-left cursor-pointer"
+          >
+            <Headphones className="w-3.5 h-3.5 text-[#34312E]/70" />
+            <span>声音入口</span>
           </button>
         </div>
       </div>
