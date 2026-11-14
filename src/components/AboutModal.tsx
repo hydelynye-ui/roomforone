@@ -43,14 +43,20 @@ export const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
           <div className="space-y-2">
             <h5 className="font-bold text-[#34312E] flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-[#91A58C]" />
-              子路径架构与数据安全隔离规范
+              独立 CloudBase 环境与数据安全隔离
             </h5>
             <div className="grid grid-cols-1 gap-2 text-[11px]">
               <div className="p-2.5 rounded-xl bg-white border border-[#C9A47E]/20 flex items-center justify-between">
                 <span className="text-[#34312E]/70 flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5 text-[#C9A47E]" /> CloudBase 环境 ID
+                </span>
+                <code className="font-mono bg-[#EFE8DC] px-1.5 py-0.5 rounded text-[#34312E]">applicable-butterfly-d9ac7eb21be</code>
+              </div>
+              <div className="p-2.5 rounded-xl bg-white border border-[#C9A47E]/20 flex items-center justify-between">
+                <span className="text-[#34312E]/70 flex items-center gap-1">
                   <Layers className="w-3.5 h-3.5 text-[#C9A47E]" /> 部署路径
                 </span>
-                <code className="font-mono bg-[#EFE8DC] px-1.5 py-0.5 rounded text-[#34312E]">/roomforone/</code>
+                <code className="font-mono bg-[#EFE8DC] px-1.5 py-0.5 rounded text-[#34312E]">/ (独立根路径)</code>
               </div>
               <div className="p-2.5 rounded-xl bg-white border border-[#C9A47E]/20 flex items-center justify-between">
                 <span className="text-[#34312E]/70 flex items-center gap-1">
@@ -66,9 +72,9 @@ export const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
               </div>
               <div className="p-2.5 rounded-xl bg-white border border-[#C9A47E]/20 flex items-center justify-between">
                 <span className="text-[#34312E]/70 flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#91A58C]" /> Focus Space 根目录保护
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#91A58C]" /> 独立环境架构
                 </span>
-                <span className="text-[#91A58C] font-semibold">100% 独立隔离，互不覆盖</span>
+                <span className="text-[#91A58C] font-semibold">100% 独立环境，完全物理隔离</span>
               </div>
             </div>
           </div>

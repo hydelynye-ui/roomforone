@@ -1,6 +1,6 @@
 {
   "version": "2.1",
-  "envId": "focus-space-d5gmg1bimc422765f",
+  "envId": "applicable-butterfly-d9ac7eb21be",
   "hosting": [
     {
       "name": "roomforone",
@@ -9,15 +9,7 @@
       "installCommand": "npm ci",
       "buildCommand": "npm run build",
       "outputDir": "dist",
-      "deployPath": "/roomforone"
+      "deployPath": "/"
     }
-  ],
-  "gateway": {
-    "routes": [
-      {
-        "path": "/roomforone",
-        "target": "hosting:roomforone"
-      }
-    ]
-  }
+  ]
 }

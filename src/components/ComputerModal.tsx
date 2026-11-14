@@ -24,7 +24,7 @@ export const ComputerModal: React.FC<ComputerModalProps> = ({ onClose }) => {
       tag: 'React 19 / TypeScript / IndexedDB',
       description: '集专注计时、任务清单、日程规划与声景于一体的心流空间，支持多时钟视觉与平滑场景切换。',
       highlights: ['多时钟视觉渲染引擎', '防漂移高精度计时', '纯前端本地双重持久化'],
-      demoUrl: '/',
+      demoUrl: 'https://focus-space-d5gmg1bimc422765f-1525079590.tcloudbaseapp.com/',
     },
     {
       id: 'pricing-engine',
