@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-wall: #EFE8DC;
+    --color-wood: #C9A47E;
+    --color-text: #34312E;
+    --color-sage: #91A58C;
+    --color-terracotta: #C98464;
+    --color-paper: #FAF7F0;
+  }
+
+  body {
+    background-color: var(--color-wall);
+    color: var(--color-text);
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    touch-action: manipulation;
+  }
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.03);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(201, 164, 126, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 164, 126, 0.7);
+}
+
+.paper-shadow {
+  box-shadow: 0 4px 20px -2px rgba(52, 49, 46, 0.08), 0 2px 6px -1px rgba(52, 49, 46, 0.04);
+}
+
+.paper-card {
+  background-color: #FAF7F0;
+  border: 1px solid rgba(201, 164, 126, 0.25);
+  box-shadow: 0 4px 16px -4px rgba(52, 49, 46, 0.06);
+}
+
+.font-serif-sc {
+  font-family: 'Noto Serif SC', serif;
+}
