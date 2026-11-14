@@ -5,6 +5,8 @@ import {
   Palette, 
   Gamepad2, 
   Hammer, 
+  Lightbulb,
+  Headphones,
   SlidersHorizontal, 
   Info 
 } from 'lucide-react';
@@ -25,6 +27,8 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
     { id: 'drawing', label: '画板', icon: <Palette className="w-4 h-4" /> },
     { id: 'game', label: '游戏', icon: <Gamepad2 className="w-4 h-4" /> },
     { id: 'diy', label: '手作', icon: <Hammer className="w-4 h-4" /> },
+    { id: 'tangle', label: '灵感', icon: <Lightbulb className="w-4 h-4" /> },
+    { id: 'headphones', label: '声音', icon: <Headphones className="w-4 h-4" /> },
     { id: 'atmosphere', label: '氛围', icon: <SlidersHorizontal className="w-4 h-4" /> },
     { id: 'about', label: '关于', icon: <Info className="w-4 h-4" /> },
   ];
