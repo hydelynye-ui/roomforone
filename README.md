@@ -10,6 +10,8 @@
 - **物件直观导航入口**：
   - 💻 **电脑**：个人作品集与项目 Bento 展示面板。
   - 🎨 **画板**：Canvas 2D 自由涂鸦创作，支持画笔、橡皮、色盘、撤销与 PNG 导出，草稿自动暂存至本地 IndexedDB。
+  - 🧩 **Tangle**：桌面思考物件，点击后打开随手灵感便签，记录仅保存在当前设备。
+  - 🎧 **AirPods Max**：私人听觉入口，复用同一个环境音引擎，可调整天气声与房间声比例。
   - 🎮 **游戏手柄**：秋日接落叶 30 秒轻量趣味小游戏，支持键盘/触摸操控竹篮与最高分持久化。
   - 🔨 **侧墙洞洞板**：木工、客制化键盘与精装手账的手作图文记录。
   - 🪟 **窗户**：开/关窗状态切换，实时联动外部雨雪风声滤波器与粒子进入边界。
@@ -69,6 +71,8 @@ roomforone/
         ├── DrawingModal.tsx   # 涂鸦画板弹窗
         ├── GameModal.tsx      # 接落叶游戏弹窗
         ├── DIYModal.tsx       # 手作记录弹窗
+        ├── TangleModal.tsx    # Tangle 随手灵感便签
+        ├── HeadphonesModal.tsx# AirPods Max 声音入口
         ├── AtmosphereModal.tsx# 氛围与混音弹窗
         ├── MoodAIModal.tsx    # AI 心情转换弹窗
         └── AboutModal.tsx     # 关于与环境信息弹窗
