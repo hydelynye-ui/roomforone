@@ -6,7 +6,7 @@
     "serviceName": "roomforone",
     "root": ".",
     "framework": "vite",
-    "installCommand": "npm ci",
+    "installCommand": "npm ci --include=optional",
     "buildCommand": "npm run build",
     "outputDir": "dist",
     "deployPath": "/"
