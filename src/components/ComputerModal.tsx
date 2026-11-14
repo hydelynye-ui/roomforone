@@ -15,7 +15,7 @@ export const ComputerModal: React.FC<ComputerModalProps> = ({ onClose }) => {
       tag: 'Three.js / React 19 / Web Audio',
       description: '一个人的房间。将 3D 物件探索、自适应当季天气、环境音模拟、画板创作与 AI 心情氛围转换融为一体。',
       highlights: ['低多边形开放剖面房间', '环境音与天气程序化联动', '独立命名空间与本地离线存储'],
-      link: 'https://github.com/roomforone',
+      link: 'https://github.com/hydelynye-ui/roomforone',
     },
     {
       id: 'focus-space',

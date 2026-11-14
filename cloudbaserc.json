@@ -1,15 +1,14 @@
 {
   "version": "2.1",
   "envId": "applicable-butterfly-d9ac7eb21be",
-  "hosting": [
-    {
-      "name": "roomforone",
-      "root": ".",
-      "framework": "vite",
-      "installCommand": "npm ci",
-      "buildCommand": "npm run build",
-      "outputDir": "dist",
-      "deployPath": "/"
-    }
-  ]
+  "region": "ap-shanghai",
+  "app": {
+    "serviceName": "roomforone",
+    "root": ".",
+    "framework": "vite",
+    "installCommand": "npm ci",
+    "buildCommand": "npm run build",
+    "outputDir": "dist",
+    "deployPath": "/"
+  }
 }
