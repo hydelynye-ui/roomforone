@@ -16,6 +16,7 @@ export const DEFAULT_ROOM_STATE: RoomState = {
   volumeAmbient: 0.4,
   stickyNote: '给自己留一点空间，呼吸、放空，或者做一点喜欢的手作。',
   roomRotation: 0,
+  weatherMode: 'live',
 };
 
 // Safe LocalStorage wrapper
