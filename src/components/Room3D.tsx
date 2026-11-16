@@ -1,749 +1,449 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { WeatherPreset, ModalType } from '../types';
+import { SVGRenderer } from 'three/examples/jsm/renderers/SVGRenderer.js';
+import type { InteractionPhase, ModalType, ObjectId, ObjectPose, RoomState, Vec3 } from '../types';
+import { constrainPose, deformTangle, INITIAL_POSES, initialTangle, clamp } from '../room/constraints';
 
-interface Room3DProps {
-  weather: WeatherPreset;
-  windowOpen: boolean;
-  lampOn: boolean;
+interface Props {
+  state: RoomState;
+  blocked: boolean;
+  editTarget: ObjectId | null;
+  onEditEnd: () => void;
   onSelectModal: (modal: ModalType) => void;
   onToggleWindow: () => void;
   onToggleLamp: () => void;
-  onRotationChange?: (angle: number) => void;
+  onPose: (id: ObjectId, pose: ObjectPose) => void;
+  onTangle: (nodes: Vec3[]) => void;
+  onRotation: (value: number) => void;
 }
+const names: Record<ObjectId, string> = { computer: '电脑', keyboard: '键盘', mouse: '鼠标', tangle: 'Tangle', headphones: 'AirPods Max', game: 'Switch 手柄', lamp: '台灯', atmosphere: '收音机', tools: 'DIY 工具' };
+const phases: Record<InteractionPhase, string> = { idle: '待机', hover: '悬停', selected: '已选中', picked: '已拿起', manipulating: '操作中', released: '已放回' };
+interface Handle { select: (id: ObjectId) => void; rotate: (delta: number) => void; move: (x: number, z: number) => void; reset: () => void; resetView: () => void }
 
-export const Room3D: React.FC<Room3DProps> = ({
-  weather,
-  windowOpen,
-  lampOn,
-  onSelectModal,
-  onToggleWindow,
-  onToggleLamp,
-  onRotationChange,
-}) => {
+export const Room3D: React.FC<Props> = props => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
-
-  // References to keep Three.js state synced without full re-render
-  const stateRef = useRef({
-    weather,
-    windowOpen,
-    lampOn,
-    onSelectModal,
-    onToggleWindow,
-    onToggleLamp,
-  });
+  const live = useRef(props); live.current = props;
+  const handle = useRef<Handle | null>(null);
+  const [interaction, setInteraction] = useState<{ id: ObjectId | null; phase: InteractionPhase }>({ id: null, phase: 'idle' });
+  const [rotateMode, setRotateMode] = useState(false);
+  const rotationRef = useRef(false); rotationRef.current = rotateMode;
+  const [failed, setFailed] = useState(false);
+  const [simple, setSimple] = useState(false);
+  const [guide, setGuide] = useState(true);
 
   useEffect(() => {
-    stateRef.current = {
-      weather,
-      windowOpen,
-      lampOn,
-      onSelectModal,
-      onToggleWindow,
-      onToggleLamp,
-    };
-  }, [weather, windowOpen, lampOn, onSelectModal, onToggleWindow, onToggleLamp]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    // --- Scene, Camera, Renderer ---
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xEFE8DC);
-
-    const aspect = container.clientWidth / container.clientHeight;
-    const d = 5.2;
-    const camera = new THREE.OrthographicCamera(
-      -d * aspect, d * aspect, d, -d, 1, 100
-    );
-
-    // Initial isometric view
-    const initialDistance = 20;
-    const initialPitch = 0.55; // ~31 degrees
-    let currentAzimuth = 0.785; // 45 degrees
-    
-    camera.position.set(
-      initialDistance * Math.cos(initialPitch) * Math.sin(currentAzimuth),
-      initialDistance * Math.sin(initialPitch),
-      initialDistance * Math.cos(initialPitch) * Math.cos(currentAzimuth)
-    );
-    camera.lookAt(0, 0.4, 0);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    container.appendChild(renderer.domElement);
-
-    // --- Interactive Objects Map ---
-    const interactiveMeshes: THREE.Object3D[] = [];
-    const registerInteractive = (obj: THREE.Object3D, name: string) => {
-      obj.userData = { isInteractive: true, name };
-      obj.traverse((child) => {
-        child.userData = { isInteractive: true, name };
-        if (child instanceof THREE.Mesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-        }
-      });
-      interactiveMeshes.push(obj);
-      scene.add(obj);
-    };
-
-    // --- Lighting ---
-    const ambientLight = new THREE.AmbientLight(0xfff6ea, 1.2);
-    scene.add(ambientLight);
-
-    const sunLight = new THREE.DirectionalLight(0xffedd5, 1.8);
-    sunLight.position.set(-6, 9, -2);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 30;
-    sunLight.shadow.camera.left = -6;
-    sunLight.shadow.camera.right = 6;
-    sunLight.shadow.camera.top = 6;
-    sunLight.shadow.camera.bottom = -6;
-    sunLight.shadow.bias = -0.0005;
-    scene.add(sunLight);
-
-    // Desk Lamp Point Light
-    const lampLight = new THREE.PointLight(0xffaa44, 0, 4);
-    lampLight.position.set(-0.8, 1.6, -1.1);
-    lampLight.castShadow = true;
-    scene.add(lampLight);
-
-    // --- Materials Palette ---
-    const matWall = new THREE.MeshStandardMaterial({ color: 0xF5F0E6, roughness: 0.8 });
-    const matFloor = new THREE.MeshStandardMaterial({ color: 0xD7B896, roughness: 0.6 });
-    const matWood = new THREE.MeshStandardMaterial({ color: 0xB58756, roughness: 0.5 });
-    const matDarkWood = new THREE.MeshStandardMaterial({ color: 0x825E3B, roughness: 0.5 });
-    const matScreen = new THREE.MeshBasicMaterial({ color: 0x22272E });
-    const screenDayMaterial = new THREE.MeshBasicMaterial({ color: 0x24292E });
-    const screenNightMaterial = new THREE.MeshBasicMaterial({ color: 0x60A5FA });
-    const matSage = new THREE.MeshStandardMaterial({ color: 0x91A58C, roughness: 0.6 });
-    const matTerracotta = new THREE.MeshStandardMaterial({ color: 0xC98464, roughness: 0.5 });
-    const matMetal = new THREE.MeshStandardMaterial({ color: 0x4A4E54, metalness: 0.8, roughness: 0.2 });
-    const matGlass = new THREE.MeshPhysicalMaterial({
-      color: 0xE8F4F8,
-      transparent: true,
-      opacity: 0.35,
-      roughness: 0.1,
-      transmission: 0.8,
-    });
-
-    // --- Room Shell (Floor & 2 Walls) ---
-    // Floor
-    const floorGeo = new THREE.BoxGeometry(6.4, 0.3, 6.4);
-    const floor = new THREE.Mesh(floorGeo, matFloor);
-    floor.position.set(0, -0.15, 0);
-    floor.receiveShadow = true;
-    scene.add(floor);
-
-    // Cozy Rug
-    const rugGeo = new THREE.BoxGeometry(3.0, 0.02, 2.6);
-    const matRug = new THREE.MeshStandardMaterial({ color: 0xE6DFD3, roughness: 0.9 });
-    const rug = new THREE.Mesh(rugGeo, matRug);
-    rug.position.set(0.4, 0.01, 0.8);
-    rug.receiveShadow = true;
-    scene.add(rug);
-
-    // Back Wall (Z = -3.2)
-    const backWallGeo = new THREE.BoxGeometry(6.4, 4.2, 0.25);
-    const backWall = new THREE.Mesh(backWallGeo, matWall);
-    backWall.position.set(0, 1.95, -3.2);
-    backWall.receiveShadow = true;
-    scene.add(backWall);
-
-    // Left Wall (X = -3.2)
-    const leftWallGeo = new THREE.BoxGeometry(0.25, 4.2, 6.4);
-    const leftWall = new THREE.Mesh(leftWallGeo, matWall);
-    leftWall.position.set(-3.2, 1.95, 0);
-    leftWall.receiveShadow = true;
-    scene.add(leftWall);
-
-    // Skirting boards
-    const skirtGeo1 = new THREE.BoxGeometry(6.4, 0.16, 0.08);
-    const skirt1 = new THREE.Mesh(skirtGeo1, matDarkWood);
-    skirt1.position.set(0, 0.08, -3.05);
-    scene.add(skirt1);
-
-    const skirtGeo2 = new THREE.BoxGeometry(0.08, 0.16, 6.4);
-    const skirt2 = new THREE.Mesh(skirtGeo2, matDarkWood);
-    skirt2.position.set(-3.05, 0.08, 0);
-    scene.add(skirt2);
-
-    // --- Window on Back Wall ---
-    const windowGroup = new THREE.Group();
-    windowGroup.position.set(0.6, 2.3, -3.06);
-
-    const frameOuterGeo = new THREE.BoxGeometry(2.4, 1.8, 0.1);
-    const frameOuter = new THREE.Mesh(frameOuterGeo, matWood);
-    windowGroup.add(frameOuter);
-
-    // Glass panes
-    const glassPaneGeo = new THREE.BoxGeometry(1.05, 1.5, 0.02);
-    const leftGlass = new THREE.Mesh(glassPaneGeo, matGlass);
-    leftGlass.position.set(-0.55, 0, 0);
-    windowGroup.add(leftGlass);
-
-    const rightGlass = new THREE.Mesh(glassPaneGeo, matGlass);
-    rightGlass.position.set(0.55, 0, 0);
-    windowGroup.add(rightGlass);
-
-    // Window sill with a small potted plant
-    const sillGeo = new THREE.BoxGeometry(2.6, 0.08, 0.35);
-    const sill = new THREE.Mesh(sillGeo, matDarkWood);
-    sill.position.set(0, -0.9, 0.15);
-    sill.castShadow = true;
-    windowGroup.add(sill);
-
-    // Pot
-    const potGeo = new THREE.CylinderGeometry(0.12, 0.09, 0.18, 16);
-    const pot = new THREE.Mesh(potGeo, matTerracotta);
-    pot.position.set(0.9, -0.76, 0.15);
-    windowGroup.add(pot);
-
-    const plantLeavesGeo = new THREE.SphereGeometry(0.16, 12, 12);
-    const plantLeaves = new THREE.Mesh(plantLeavesGeo, matSage);
-    plantLeaves.position.set(0.9, -0.62, 0.15);
-    plantLeaves.scale.set(1, 1.4, 0.9);
-    windowGroup.add(plantLeaves);
-
-    registerInteractive(windowGroup, 'window');
-
-    // --- Work Desk & Computer ---
-    const deskGroup = new THREE.Group();
-    deskGroup.position.set(-0.2, 0, -1.8);
-
-    // Desk Tabletop
-    const tableTopGeo = new THREE.BoxGeometry(2.6, 0.1, 1.3);
-    const tableTop = new THREE.Mesh(tableTopGeo, matWood);
-    tableTop.position.set(0, 1.15, 0);
-    tableTop.castShadow = true;
-    tableTop.receiveShadow = true;
-    deskGroup.add(tableTop);
-
-    // Desk Legs
-    const legGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.15, 12);
-    [
-      [-1.15, 0.575, -0.5],
-      [1.15, 0.575, -0.5],
-      [-1.15, 0.575, 0.5],
-      [1.15, 0.575, 0.5],
-    ].forEach(([lx, ly, lz]) => {
-      const leg = new THREE.Mesh(legGeo, matDarkWood);
-      leg.position.set(lx, ly, lz);
-      leg.castShadow = true;
-      deskGroup.add(leg);
-    });
-
-    // Computer Monitor
-    const monitorGroup = new THREE.Group();
-    monitorGroup.position.set(-0.15, 1.2, -0.2);
-
-    const monitorStand = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.08, 0.25, 12), matMetal);
-    monitorStand.position.set(0, 0.125, 0);
-    monitorGroup.add(monitorStand);
-
-    const monitorBody = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.65, 0.05), matMetal);
-    monitorBody.position.set(0, 0.45, 0);
-    monitorGroup.add(monitorBody);
-
-    const monitorScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.92, 0.57), matScreen);
-    monitorScreen.position.set(0, 0.45, 0.026);
-    monitorGroup.add(monitorScreen);
-
-    // Keyboard & Mouse
-    const keyboard = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, 0.18), matWall);
-    keyboard.position.set(0, 0.01, 0.35);
-    monitorGroup.add(keyboard);
-
-    const mouse = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.12), matSage);
-    mouse.position.set(0.38, 0.01, 0.35);
-    monitorGroup.add(mouse);
-
-    deskGroup.add(monitorGroup);
-    registerInteractive(deskGroup, 'computer');
-
-    // --- Tangle desk object (interactive thinking / note entry) ---
-    // Three low-poly loops make the object recognizable without requiring a texture asset.
-    const tangleGroup = new THREE.Group();
-    tangleGroup.position.set(0.42, 1.25, -1.92);
-    tangleGroup.rotation.set(0.15, -0.2, 0.1);
-    const tangleMaterial = new THREE.MeshStandardMaterial({
-      color: 0xC98464,
-      roughness: 0.35,
-      metalness: 0.1,
-    });
-    const tangleLoop = new THREE.TorusGeometry(0.16, 0.035, 6, 12);
-    const tangleLoopA = new THREE.Mesh(tangleLoop, tangleMaterial);
-    tangleLoopA.rotation.set(0.2, 0.3, 0.2);
-    const tangleLoopB = new THREE.Mesh(tangleLoop, matSage);
-    tangleLoopB.rotation.set(1.1, 0.4, -0.5);
-    const tangleLoopC = new THREE.Mesh(tangleLoop, matTerracotta);
-    tangleLoopC.rotation.set(0.6, 1.2, 0.8);
-    tangleGroup.add(tangleLoopA, tangleLoopB, tangleLoopC);
-    registerInteractive(tangleGroup, 'tangle');
-
-    // --- AirPods Max desk stand (interactive sound entry) ---
-    const headphonesGroup = new THREE.Group();
-    headphonesGroup.position.set(-0.82, 1.28, -1.98);
-    headphonesGroup.rotation.y = -0.25;
-    const headphoneBand = new THREE.Mesh(
-      new THREE.TorusGeometry(0.27, 0.035, 8, 18, Math.PI),
-      matMetal,
-    );
-    headphoneBand.rotation.x = Math.PI / 2;
-    headphoneBand.position.y = 0.18;
-    const earCupLeft = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.08, 12), matMetal);
-    earCupLeft.rotation.z = Math.PI / 2;
-    earCupLeft.position.set(-0.2, 0.04, 0);
-    const earCupRight = earCupLeft.clone();
-    earCupRight.position.x = 0.2;
-    const headphoneStand = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 0.38, 8), matWood);
-    headphoneStand.position.y = -0.08;
-    headphonesGroup.add(headphoneBand, earCupLeft, earCupRight, headphoneStand);
-    registerInteractive(headphonesGroup, 'headphones');
-
-    // Desk Chair
-    const chairGroup = new THREE.Group();
-    chairGroup.position.set(-0.35, 0, -0.8);
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.7), matSage);
-    seat.position.set(0, 0.68, 0);
-    chairGroup.add(seat);
-    const backRest = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 0.08), matSage);
-    backRest.position.set(0, 1.05, 0.32);
-    chairGroup.add(backRest);
-    const chairLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.68, 12), matMetal);
-    chairLeg.position.set(0, 0.34, 0);
-    chairGroup.add(chairLeg);
-    scene.add(chairGroup);
-
-    // --- Desk Lamp (Interactive toggle) ---
-    const lampGroup = new THREE.Group();
-    lampGroup.position.set(-1.0, 1.2, -0.3);
-
-    const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.04, 16), matSage);
-    lampBase.position.set(0, 0.02, 0);
-    lampGroup.add(lampBase);
-
-    const lampStem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.45, 8), matMetal);
-    lampStem.position.set(0, 0.24, 0);
-    lampStem.rotation.z = -0.2;
-    lampGroup.add(lampStem);
-
-    const lampHead = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.22, 16), matSage);
-    lampHead.position.set(0.12, 0.46, 0);
-    lampHead.rotation.z = 2.1;
-    lampGroup.add(lampHead);
-
-    registerInteractive(lampGroup, 'lamp');
-
-    // --- Gamepad on the Desk Corner ---
-    const gamepadGroup = new THREE.Group();
-    gamepadGroup.position.set(0.75, 1.21, 0.25);
-    gamepadGroup.rotation.y = -0.3;
-
-    const gamepadBody = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.18), matTerracotta);
-    gamepadGroup.add(gamepadBody);
-
-    const dpad = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.02, 0.06), matMetal);
-    dpad.position.set(-0.08, 0.03, 0);
-    gamepadGroup.add(dpad);
-
-    const buttonA = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 8), matSage);
-    buttonA.position.set(0.08, 0.03, 0);
-    gamepadGroup.add(buttonA);
-
-    registerInteractive(gamepadGroup, 'game');
-
-    // --- Radio / Speaker on Shelf/Desk ---
-    const radioGroup = new THREE.Group();
-    radioGroup.position.set(0.9, 1.22, -0.4);
-    radioGroup.rotation.y = 0.2;
-
-    const radioBody = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.22, 0.14), matDarkWood);
-    radioGroup.add(radioBody);
-
-    const speakerGrill = new THREE.Mesh(new THREE.CircleGeometry(0.07, 16), matMetal);
-    speakerGrill.position.set(-0.07, 0, 0.071);
-    radioGroup.add(speakerGrill);
-
-    const radioDial = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.02, 12), matTerracotta);
-    radioDial.position.set(0.08, 0.04, 0.071);
-    radioDial.rotation.x = Math.PI / 2;
-    radioGroup.add(radioDial);
-
-    registerInteractive(radioGroup, 'atmosphere');
-
-    // --- Easel / Drawing Board (Right corner) ---
-    const easelGroup = new THREE.Group();
-    easelGroup.position.set(2.0, 0, 0.8);
-    easelGroup.rotation.y = -0.55;
-
-    // Easel tripod legs
-    const tripodLegGeo = new THREE.CylinderGeometry(0.03, 0.03, 2.5, 8);
-    const legLeft = new THREE.Mesh(tripodLegGeo, matWood);
-    legLeft.position.set(-0.4, 1.25, 0);
-    legLeft.rotation.z = -0.15;
-    easelGroup.add(legLeft);
-
-    const legRight = new THREE.Mesh(tripodLegGeo, matWood);
-    legRight.position.set(0.4, 1.25, 0);
-    legRight.rotation.z = 0.15;
-    easelGroup.add(legRight);
-
-    const legBack = new THREE.Mesh(tripodLegGeo, matWood);
-    legBack.position.set(0, 1.25, -0.6);
-    legBack.rotation.x = -0.28;
-    easelGroup.add(legBack);
-
-    // Canvas board
-    const canvasBoard = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.5, 0.06), matWall);
-    canvasBoard.position.set(0, 1.45, 0);
-    canvasBoard.rotation.x = -0.12;
-    easelGroup.add(canvasBoard);
-
-    // Palette with colors on easel shelf
-    const palette = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.02, 16), matWood);
-    palette.position.set(0.15, 0.72, 0.2);
-    easelGroup.add(palette);
-
-    registerInteractive(easelGroup, 'drawing');
-
-    // --- DIY Workbench & Pegboard (Left Wall) ---
-    const diyGroup = new THREE.Group();
-    diyGroup.position.set(-3.0, 0, 1.2);
-
-    // Small workbench cabinet
-    const benchCabinet = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.1, 1.6), matDarkWood);
-    benchCabinet.position.set(0.18, 0.55, 0);
-    diyGroup.add(benchCabinet);
-
-    // Wall Pegboard
-    const pegboard = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.4, 1.6), matWood);
-    pegboard.position.set(0.02, 1.9, 0);
-    diyGroup.add(pegboard);
-
-    // Hanging tools (Small hammer, scissors, ruler models)
-    const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.35, 0.12), matMetal);
-    hammer.position.set(0.07, 2.0, -0.4);
-    diyGroup.add(hammer);
-
-    const scissors = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.25, 0.08), matTerracotta);
-    scissors.position.set(0.07, 1.9, 0.1);
-    diyGroup.add(scissors);
-
-    registerInteractive(diyGroup, 'diy');
-
-    // --- Weather Particles Outside Window ---
-    const particleCount = 200;
-    const particleGeo = new THREE.BufferGeometry();
-    const particlePositions = new Float32Array(particleCount * 3);
-    const particleVelocities = new Float32Array(particleCount * 3);
-
-    for (let i = 0; i < particleCount; i++) {
-      particlePositions[i * 3] = (Math.random() - 0.5) * 5 + 0.6;
-      particlePositions[i * 3 + 1] = Math.random() * 5 + 0.5;
-      particlePositions[i * 3 + 2] = -3.5 - Math.random() * 2;
-
-      particleVelocities[i * 3] = 0;
-      particleVelocities[i * 3 + 1] = -0.05;
-      particleVelocities[i * 3 + 2] = 0;
+    const host = containerRef.current;
+    if (!host) return;
+    let renderer: THREE.WebGLRenderer | SVGRenderer;
+    let software = false;
+    try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' }); }
+    catch {
+      try { renderer = new SVGRenderer(); renderer.setQuality('low'); renderer.setPrecision(2); software = true; setSimple(true); }
+      catch { setFailed(true); return; }
     }
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const mobile = window.matchMedia('(max-width: 767px)').matches;
+    if (renderer instanceof THREE.WebGLRenderer) {
+      renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.35 : 1.7));
+      renderer.shadowMap.enabled = !mobile;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.25;
+    }
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    host.appendChild(renderer.domElement);
+    renderer.domElement.style.touchAction = 'none';
+    renderer.domElement.setAttribute('aria-label', '可旋转和拖动物件的 roomforone 房间');
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-6, 6, 5, -5, 0.1, 100);
+    let yaw = props.state.roomRotation, selected: ObjectId | null = null;
+    let currentEdit: ObjectId | null = null, disposed = false;
+    let phase: InteractionPhase = 'idle';
+    const target = new THREE.Vector3(0, 1.25, 0), desiredTarget = target.clone();
+    let zoom = 1, desiredZoom = 1;
+    const groups = {} as Record<ObjectId, THREE.Group>;
+    const poses = structuredClone({ ...INITIAL_POSES, ...props.state.objectPoses });
+    let nodes = props.state.tangleNodes.map(p => [...p] as Vec3);
+    let previousNodes = props.state.tangleNodes;
+    const clickables: THREE.Object3D[] = [];
+    const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>(), textures = new Set<THREE.Texture>();
+    const material = (color: number, options: THREE.MeshStandardMaterialParameters = {}) => {
+      const m = new THREE.MeshStandardMaterial({ color, roughness: 0.84, ...options }); materials.add(m); return m;
+    };
+    const wall = material(0xEFE8DC), wood = material(0xC9A47E), darkWood = material(0x89674C);
+    const sage = material(0x91A58C), terracotta = material(0xC98464), graphite = material(0x34312E);
+    const paper = material(0xFAF7F0), silver = material(0xACB5B0, { roughness: 0.55, metalness: 0.3 });
+    const peach = material(0xF5B4BC, { transparent: true, opacity: 0.78, roughness: 0.4 });
+    const mesh = (geometry: THREE.BufferGeometry, mat: THREE.Material, parent: THREE.Object3D, p: Vec3 = [0, 0, 0]) => {
+      geometries.add(geometry); const m = new THREE.Mesh(geometry, mat); m.position.set(...p); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
+    };
+    const box = (size: Vec3, mat: THREE.Material, parent: THREE.Object3D, p: Vec3 = [0, 0, 0]) => mesh(new THREE.BoxGeometry(...size, ...size.map(v => Math.max(1, Math.ceil(v * 2))) as [number, number, number]), mat, parent, p);
+    const cylinder = (r: number, height: number, mat: THREE.Material, parent: THREE.Object3D, p: Vec3 = [0, 0, 0]) => mesh(new THREE.CylinderGeometry(r, r, height, 12), mat, parent, p);
+    const sphereGeo = new THREE.SphereGeometry(0.06, 10, 8); geometries.add(sphereGeo);
+    const group = (id: ObjectId) => {
+      const g = groups[id] = new THREE.Group(); g.userData = { id }; scene.add(g);
+      g.position.set(...poses[id].position); g.rotation.y = poses[id].rotation; return g;
+    };
+    const register = (g: THREE.Object3D, id: string) => { g.userData.id = id; clickables.push(g); };
 
-    particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-    const particleMat = new THREE.PointsMaterial({
-      size: 0.08,
-      color: 0x90CDF4,
-      transparent: true,
-      opacity: 0.7,
-    });
-    const particleSystem = new THREE.Points(particleGeo, particleMat);
-    scene.add(particleSystem);
+    const ambient = new THREE.HemisphereLight(0xFFF6E6, 0xB7A18C, 2.1); scene.add(ambient);
+    if (software) scene.add(new THREE.AmbientLight(0xFFF6EA, 0.65));
+    const sun = new THREE.DirectionalLight(0xFFE4B1, software ? 0.85 : 3.0); sun.position.set(2, 7, -4); sun.castShadow = !mobile;
+    sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = -6; sun.shadow.camera.right = 6; sun.shadow.camera.top = 6; sun.shadow.camera.bottom = -6; sun.shadow.bias = -0.001; scene.add(sun);
+    const lampLight = new THREE.PointLight(0xFFBE70, 0, 4, 1.8); scene.add(lampLight);
 
-    // --- Update Visuals Based on Weather & Lamps ---
-    const updateSceneAtmosphere = () => {
-      const cur = stateRef.current;
-      
-      // Lamp point light
-      lampLight.intensity = cur.lampOn ? 3.0 : 0;
-      lampLight.color.setHex(0xffaa44);
+    // Retained open-cut room, with an actual window aperture instead of a solid wall behind glass.
+    box([6.4, 0.24, 6.4], wood, scene, [0, -0.12, 0]).renderOrder = software ? -10 : 0;
+    for (let i = 0; i < 10; i++) box([6.35, 0.004, 0.012], darkWood, scene, [0, 0.004, -2.85 + i * 0.63]).renderOrder = software ? -9 : 0;
+    const leftWall = box([0.15, 4.2, 6.4], wall, scene, [-3.2, 2.0, 0]);
+    const back = new THREE.Group(); scene.add(back);
+    box([6.4, 1.65, 0.15], wall, back, [0, 0.705, -3.2]);
+    box([6.4, 0.75, 0.15], wall, back, [0, 3.725, -3.2]);
+    box([2.55, 1.82, 0.15], wall, back, [-1.925, 2.44, -3.2]);
+    box([1.45, 1.82, 0.15], wall, back, [2.475, 2.44, -3.2]);
+    box([6.3, 0.14, 0.08], darkWood, scene, [0, 0.07, -3.09]);
+    box([0.08, 0.14, 6.3], darkWood, scene, [-3.09, 0.07, 0]);
+    if (software) {
+      const rug = mesh(new THREE.PlaneGeometry(3.3, 2.65), material(0xDEDCCB), scene, [0.2, 0.03, 0.9]); rug.rotation.x = -Math.PI / 2; rug.renderOrder = -8;
+    } else box([3.3, 0.025, 2.65], material(0xDEDCCB), scene, [0.2, 0.02, 0.9]);
+    for (let i = 0; i < (software ? 0 : 8); i++) box([0.012, 0.003, 2.55], paper, scene, [-1.2 + i * 0.4, 0.035, 0.9]).renderOrder = software ? -7 : 0;
 
-      // Window position
-      rightGlass.position.x = cur.windowOpen ? 0.95 : 0.55;
+    const windowGroup = new THREE.Group(); windowGroup.position.set(0.55, 2.44, -3.12); scene.add(windowGroup);
+    for (const x of [-1.2, 0, 1.2]) box([0.09, 1.86, 0.13], wood, windowGroup, [x, 0, 0]);
+    for (const y of [-0.92, 0.92]) box([2.48, 0.09, 0.13], wood, windowGroup, [0, y, 0]);
+    box([2.7, 0.09, 0.4], darkWood, windowGroup, [0, -0.96, 0.08]);
+    register(windowGroup, 'window');
+    const glass = material(0xD6E8DF, { transparent: true, opacity: 0.13, depthWrite: false });
+    const pane = box([1.1, 1.7, 0.025], glass, windowGroup, [0.59, 0, 0.09]);
+    box([1.1, 1.7, 0.025], glass, windowGroup, [-0.59, 0, 0.09]);
+    const skyMaterial = new THREE.ShaderMaterial({
+      uniforms: { time: { value: 0 }, weather: { value: 0 }, blend: { value: 0 }, sky: { value: new THREE.Color(0xBFD8CB) } },
+      vertexShader: 'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+      fragmentShader: `varying vec2 vUv; uniform float time; uniform float weather; uniform vec3 sky;
+        float hash(float x){return fract(sin(x*127.1)*43758.5453);}
+        void main(){vec3 c=mix(sky*.78,sky+vec3(.08),vUv.y);float hills=smoothstep(.28,.29,vUv.y-.05*sin(vUv.x*14.));c=mix(sky*.52,c,hills);
+        for(int i=0;i<30;i++){float n=float(i);vec2 p=vec2(hash(n+1.),fract(hash(n+4.)-time*(weather<1.5?.45:.08)));float s=weather<1.5?.012:.018;float d=length((vUv-p)*vec2(weather<1.5?1.:1.,weather<1.5?.15:1.));float a=1.-smoothstep(s,s+.008,d);if(weather>.5&&weather<3.5)c=mix(c,weather<1.5?vec3(.66,.8,.84):weather<2.5?vec3(.96):vec3(.8,.46,.18),a*.8);}
+        gl_FragColor=vec4(c,1.); }`,
+    }); materials.add(skyMaterial);
+    const simpleSky = material(0xBFDED5);
+    mesh(new THREE.PlaneGeometry(2.42, 1.84), software ? simpleSky : skyMaterial, scene, [0.55, 2.44, -3.33]);
+    const rainGeometry = new THREE.BufferGeometry(); geometries.add(rainGeometry);
+    const rainPoints = new Float32Array(60 * 3);
+    for (let i = 0; i < 60; i++) { rainPoints[i * 3] = -0.55 + Math.random() * 2.2; rainPoints[i * 3 + 1] = 1.6 + Math.random() * 1.65; rainPoints[i * 3 + 2] = -3.02; }
+    rainGeometry.setAttribute('position', new THREE.BufferAttribute(rainPoints, 3));
+    const rainMat = new THREE.PointsMaterial({ color: 0xBCDDE3, size: 0.024, transparent: true, opacity: 0.3, depthWrite: false }); materials.add(rainMat);
+    const rain = new THREE.Points(rainGeometry, rainMat); scene.add(rain);
+    const snowGeometry = rainGeometry.clone(); geometries.add(snowGeometry);
+    const snowMat = new THREE.PointsMaterial({ color: 0xFFFFFF, size: 0.045, transparent: true, opacity: 0.8 }); materials.add(snowMat);
+    const snow = new THREE.Points(snowGeometry, snowMat); scene.add(snow);
+    const dustGeo = new THREE.BufferGeometry(); geometries.add(dustGeo);
+    const dustPositions = new Float32Array(24 * 3);
+    for (let i = 0; i < 24; i++) { dustPositions[i * 3] = -0.5 + Math.random() * 2; dustPositions[i * 3 + 1] = 0.5 + Math.random(); dustPositions[i * 3 + 2] = -0.3 + Math.random() * 1.6; }
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+    const dustMat = new THREE.PointsMaterial({ color: 0xFFF4D0, size: 0.016, transparent: true, opacity: 0.45, depthWrite: false }); materials.add(dustMat);
+    const dust = new THREE.Points(dustGeo, dustMat); scene.add(dust);
+    const sunlightMat = new THREE.MeshBasicMaterial({ color: 0xFFE5AB, transparent: true, opacity: 0.2, depthWrite: false }); materials.add(sunlightMat);
+    const sunlight = box([2.3, 0.001, 2.3], sunlightMat, scene, [0.6, 0.044, 0.2]); sunlight.rotation.y = -0.45; sunlight.renderOrder = software ? -6 : 0; sunlight.visible = !software;
+    const sunCross = new THREE.Group(); sunCross.position.set(0.6, 0.05, 0.2); sunCross.rotation.y = -0.45; scene.add(sunCross);
+    box([0.045, 0.002, 2.3], material(0xAA9474), sunCross); box([2.3, 0.002, 0.045], material(0xAA9474), sunCross);
+    const curtain = box([0.38, 1.9, 0.06], material(0xC8CCB4), scene, [-0.85, 2.47, -2.99]);
+    box([2.9, 0.06, 0.06], darkWood, scene, [0.55, 3.45, -3.0]);
+    cylinder(0.16, 0.23, terracotta, scene, [1.43, 1.63, -2.9]);
+    for (let i = 0; i < 5; i++) { const leaf = mesh(new THREE.SphereGeometry(0.13, 6, 5), sage, scene, [1.43 + Math.sin(i) * 0.14, 1.85 + i * 0.045, -2.88]); leaf.scale.set(0.6, 1.5, 0.65); }
 
-      switch (cur.weather) {
-        case 'sunny':
-          scene.background = new THREE.Color(0xEFE8DC);
-          ambientLight.color.setHex(0xfff5ea);
-          ambientLight.intensity = 1.3;
-          sunLight.color.setHex(0xfff3db);
-          sunLight.intensity = 1.9;
-          sunLight.position.set(-6, 9, -2);
-          monitorScreen.material = screenDayMaterial;
-          particleMat.opacity = 0; // No rain/snow in sunny
-          break;
+    // Existing desk, chair and easel, with props split into individually manipulable groups.
+    box([4.7, 0.13, 1.75], wood, scene, [0, 1.2, -1.85]);
+    for (const x of [-2.12, 2.12]) for (const z of [-2.48, -1.22]) box([0.1, 1.15, 0.1], darkWood, scene, [x, 0.575, z]);
+    const chair = new THREE.Group(); scene.add(chair); chair.position.set(-0.8, 0, -0.48);
+    box([0.7, 0.12, 0.7], sage, chair, [0, 0.65, 0]); box([0.7, 0.7, 0.1], sage, chair, [0, 1.0, 0.32]);
+    for (const x of [-0.26, 0.26]) for (const z of [-0.26, 0.26]) box([0.055, 0.6, 0.055], darkWood, chair, [x, 0.3, z]);
+    const easel = new THREE.Group(); easel.position.set(2.1, 0, 0.95); easel.rotation.y = -0.4; scene.add(easel);
+    for (const x of [-0.4, 0.4]) { const leg = box([0.06, 2.35, 0.08], wood, easel, [x, 1.18, 0]); leg.rotation.z = x * 0.25; }
+    const rearLeg = box([0.07, 2.3, 0.07], wood, easel, [0, 1.15, -0.42]); rearLeg.rotation.x = -0.3;
+    box([1.2, 1.5, 0.07], paper, easel, [0, 1.5, 0.03]); box([1.35, 0.08, 0.23], darkWood, easel, [0, 0.74, 0.1]);
+    const drawingMark = mesh(new THREE.TorusGeometry(0.24, 0.025, 4, 24, Math.PI * 1.5), terracotta, easel, [0.04, 1.45, 0.075]); drawingMark.rotation.z = 0.5;
+    register(easel, 'drawing');
+    box([0.45, 1, 1.65], darkWood, scene, [-2.7, 0.5, 1.1]);
+    const pegboard = box([0.08, 1.25, 1.7], wood, scene, [-3.05, 1.92, 1.1]); register(pegboard, 'diy');
+    for (let row = 0; row < 5; row++) for (let col = 0; col < 7; col++) box([0.012, 0.025, 0.025], darkWood, scene, [-3, 1.43 + row * 0.24, 0.4 + col * 0.23]);
+    register(scene.children[scene.children.length - 1], 'diy');
+    const tools = group('tools');
+    box([0.08, 0.04, 0.38], terracotta, tools); box([0.28, 0.06, 0.09], graphite, tools, [0, 0.045, -0.14]);
+    box([0.11, 0.03, 0.33], paper, tools, [0.06, 0.03, 0.19]); register(tools, 'tools');
 
-        case 'rain':
-          scene.background = new THREE.Color(0xD8DEE9);
-          ambientLight.color.setHex(0xc0c8d4);
-          ambientLight.intensity = 0.9;
-          sunLight.color.setHex(0x9ca3af);
-          sunLight.intensity = 0.6;
-          particleMat.opacity = 0.75;
-          particleMat.color.setHex(0x60A5FA);
-          particleMat.size = 0.06;
-          break;
+    const computer = group('computer');
+    box([0.44, 0.04, 0.28], silver, computer); box([0.065, 0.3, 0.065], silver, computer, [0, 0.16, 0]);
+    box([1.15, 0.72, 0.065], graphite, computer, [0, 0.6, 0]);
+    const screenMat = material(0x91A58C, { emissive: 0x456A64, emissiveIntensity: 0.2 });
+    box([1.05, 0.61, 0.01], screenMat, computer, [0, 0.6, 0.039]);
+    const screenCanvas = document.createElement('canvas'); screenCanvas.width = 512; screenCanvas.height = 288;
+    const screenContext = screenCanvas.getContext('2d')!;
+    screenContext.fillStyle = '#80988c'; screenContext.fillRect(0, 0, 512, 288); screenContext.fillStyle = '#faf7f0'; screenContext.font = '500 32px sans-serif'; screenContext.fillText('roomforone', 35, 80); screenContext.font = '16px sans-serif'; screenContext.fillText('a little space for yourself.', 35, 113);
+    for (let i = 0; i < 3; i++) { screenContext.fillStyle = ['#e3d4bd', '#c98464', '#d6dfd0'][i]; screenContext.fillRect(35 + i * 150, 160, 130, 85); }
+    const screenTexture = new THREE.CanvasTexture(screenCanvas); screenTexture.colorSpace = THREE.SRGBColorSpace; textures.add(screenTexture);
+    const texMat = new THREE.MeshBasicMaterial({ map: screenTexture, color: software ? 0x91A58C : 0xFFFFFF }); materials.add(texMat);
+    mesh(new THREE.PlaneGeometry(1.05, 0.61), texMat, computer, [0, 0.6, 0.046]); register(computer, 'computer');
+    const keyboard = group('keyboard'); box([0.64, 0.025, 0.24], silver, keyboard);
+    const keyGeo = new THREE.BoxGeometry(0.034, 0.012, 0.031); geometries.add(keyGeo);
+    for (let row = 0; row < 3; row++) for (let col = 0; col < 12; col++) mesh(keyGeo, paper, keyboard, [-0.26 + col * 0.047, 0.02, -0.07 + row * 0.06]); register(keyboard, 'keyboard');
+    const mouse = group('mouse'); const mouseBody = mesh(new THREE.SphereGeometry(0.1, 10, 8), paper, mouse); mouseBody.scale.set(0.7, 0.42, 1); register(mouse, 'mouse');
+    const lamp = group('lamp'); cylinder(0.19, 0.04, sage, lamp); const stem = box([0.035, 0.53, 0.035], darkWood, lamp, [0.04, 0.28, 0]); stem.rotation.z = -0.15;
+    mesh(new THREE.ConeGeometry(0.23, 0.22, 12, 1, true), sage, lamp, [0.1, 0.61, 0]); const bulb = mesh(new THREE.SphereGeometry(0.075, 8, 6), material(0xFFF1CB, { emissive: 0xFFCC80, emissiveIntensity: 2 }), lamp, [0.1, 0.53, 0]); register(lamp, 'lamp');
+    const radio = group('atmosphere'); box([0.5, 0.3, 0.22], darkWood, radio); const grille = mesh(new THREE.CircleGeometry(0.09, 16), graphite, radio, [-0.11, 0, 0.116]); cylinder(0.035, 0.03, paper, radio, [0.12, 0.08, 0.13]).rotation.x = Math.PI / 2; register(radio, 'atmosphere');
 
-        case 'snow':
-          scene.background = new THREE.Color(0xE2E8F0);
-          ambientLight.color.setHex(0xced8e5);
-          ambientLight.intensity = 0.85;
-          sunLight.color.setHex(0xa0aec0);
-          sunLight.intensity = 0.7;
-          particleMat.opacity = 0.9;
-          particleMat.color.setHex(0xFFFFFF);
-          particleMat.size = 0.12;
-          break;
+    // Original, recognizable low-poly AirPods Max silhouette and separate display stand.
+    const headphones = group('headphones');
+    const band = mesh(new THREE.TorusGeometry(0.25, 0.035, 6, 20, Math.PI), silver, headphones, [0, 0.53, 0]);
+    for (const x of [-0.25, 0.25]) {
+      box([0.035, 0.23, 0.035], silver, headphones, [x, 0.43, 0]);
+      const cup = box([0.13, 0.3, 0.21], sage, headphones, [x, 0.28, 0]); cup.rotation.z = x * -0.25;
+      box([0.04, 0.235, 0.16], graphite, headphones, [x + (x > 0 ? -0.07 : 0.07), 0.28, 0]);
+    }
+    register(headphones, 'headphones');
+    const stand = new THREE.Group(); scene.add(stand); stand.position.copy(headphones.position);
+    cylinder(0.2, 0.035, darkWood, stand); cylinder(0.025, 0.55, darkWood, stand, [0, 0.28, -0.045]); box([0.25, 0.04, 0.1], darkWood, stand, [0, 0.57, -0.045]);
 
-        case 'autumn':
-          scene.background = new THREE.Color(0xF3E5D8);
-          ambientLight.color.setHex(0xfce8d5);
-          ambientLight.intensity = 1.1;
-          sunLight.color.setHex(0xf59e0b);
-          sunLight.intensity = 1.6;
-          sunLight.position.set(-7, 6, -3);
-          particleMat.opacity = 0.85;
-          particleMat.color.setHex(0xD97706); // Golden leaves
-          particleMat.size = 0.14;
-          break;
+    const controller = group('game');
+    box([0.65, 0.08, 0.3], graphite, controller);
+    for (const x of [-0.34, 0.34]) { const grip = mesh(new THREE.CapsuleGeometry(0.105, 0.16, 4, 8), x < 0 ? sage : terracotta, controller, [x, 0, 0]); grip.rotation.x = Math.PI / 2; }
+    for (const x of [-0.24, 0.24]) cylinder(0.045, 0.04, graphite, controller, [x, 0.063, x < 0 ? -0.065 : 0.065]);
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2;
+      cylinder(0.021, 0.023, paper, controller, [0.24 + Math.sin(a) * 0.055, 0.06, -0.05 + Math.cos(a) * 0.045]);
+      box([0.026, 0.025, 0.026], graphite, controller, [-0.24 + Math.sin(a) * 0.05, 0.06, 0.06 + Math.cos(a) * 0.04]);
+    }
+    for (const x of [-0.14, 0.14]) box([0.04, 0.025, 0.025], paper, controller, [x, 0.06, -0.09]);
+    for (const x of [-0.3, 0.3]) box([0.14, 0.04, 0.035], graphite, controller, [x, 0.04, -0.18]);
+    cylinder(0.018, 0.02, paper, controller, [0.08, 0.06, 0.08]); register(controller, 'game');
 
-        case 'night':
-          scene.background = new THREE.Color(0x1E222A);
-          ambientLight.color.setHex(0x283042);
-          ambientLight.intensity = 0.45;
-          sunLight.color.setHex(0x3B4A6B);
-          sunLight.intensity = 0.2;
-          monitorScreen.material = screenNightMaterial;
-          particleMat.opacity = 0;
-          break;
-      }
+    const tangle = group('tangle');
+    const joints: THREE.Mesh[] = [], links: THREE.Mesh[] = [];
+    const jointGeo = new THREE.SphereGeometry(0.055, 10, 8), linkGeo = new THREE.CylinderGeometry(0.047, 0.047, 1, 8); geometries.add(jointGeo); geometries.add(linkGeo);
+    for (let i = 0; i < nodes.length; i++) { const m = mesh(jointGeo, i % 3 === 0 ? peach : terracotta, tangle); m.userData.node = i; joints.push(m); }
+    for (let i = 0; i < nodes.length - 1; i++) { const m = mesh(linkGeo, i % 3 === 0 ? peach : terracotta, tangle); m.userData.node = i; links.push(m); }
+    const up = new THREE.Vector3(0, 1, 0), temp = new THREE.Vector3();
+    const drawTangle = () => {
+      nodes.forEach((p, i) => joints[i].position.set(...p));
+      links.forEach((m, i) => { const a = new THREE.Vector3(...nodes[i]), b = new THREE.Vector3(...nodes[i + 1]); temp.subVectors(b, a); const length = temp.length(); m.position.copy(a.add(b).multiplyScalar(0.5)); m.quaternion.setFromUnitVectors(up, temp.normalize()); m.scale.set(1, length, 1); });
+    };
+    drawTangle(); register(tangle, 'tangle');
+
+    // A few paper details remain part of the quiet room rather than a separate content system.
+    for (let i = 0; i < 3; i++) {
+      const photo = box([0.48, 0.64, 0.025], paper, scene, [-1.7 + i * 0.62, 2.75 + i % 2 * 0.1, -3.08]);
+      photo.rotation.z = (i - 1) * 0.08;
+      box([0.36, 0.38, 0.015], [sage, terracotta, wood][i], photo, [0, 0.05, 0.025]);
+      box([0.19, 0.09, 0.015], material(0xDDD0B6), photo, [0, 0.33, 0.025]); register(photo, 'about');
+    }
+    const sticky = box([0.32, 0.005, 0.27], material(0xEAD4A5), scene, [-1.8, 1.272, -1.48]); sticky.rotation.y = -0.2; register(sticky, 'mood-ai');
+
+    const transition = (id: ObjectId | null, next: InteractionPhase) => { phase = next; setInteraction({ id, phase: next }); };
+    const commit = (id: ObjectId) => live.current.onPose(id, structuredClone(poses[id]));
+    const choose = (id: ObjectId) => { selected = id; transition(id, 'selected'); };
+    const resetFocus = () => { desiredTarget.set(0, 1.25, 0); desiredZoom = 1; };
+    handle.current = {
+      select: id => { choose(id); desiredTarget.set(...poses[id].position); desiredTarget.y += 0.1; desiredZoom = id === 'tangle' ? 2.6 : 1.55; },
+      rotate: delta => { if (!selected) return; const id = selected; poses[id] = constrainPose(id, { ...poses[id], rotation: poses[id].rotation + delta }, poses); groups[id].rotation.y = poses[id].rotation; commit(id); },
+      move: (x, z) => { if (!selected) return; const id = selected; const p = poses[id]; poses[id] = constrainPose(id, { ...p, position: [p.position[0] + x, p.position[1], p.position[2] + z] }, poses); commit(id); },
+      reset: () => { if (!selected) return; const id = selected; if (id === 'tangle') { nodes = initialTangle(); drawTangle(); live.current.onTangle(nodes); } else { poses[id] = structuredClone(INITIAL_POSES[id]); commit(id); } },
+      resetView: () => { selected = null; transition(null, 'idle'); resetFocus(); live.current.onEditEnd(); },
     };
 
-    // --- Interaction & Drag to Rotate (Design Spec: 100°~140° range) ---
-    let isDragging = false;
-    let startX = 0;
-    let startY = 0;
-    let hasMoved = false;
-
-    const onPointerDown = (e: PointerEvent) => {
-      isDragging = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      hasMoved = false;
+    const ray = new THREE.Raycaster(), pointer = new THREE.Vector2(), plane = new THREE.Plane(up, -1.3);
+    const pointAt = (event: PointerEvent) => {
+      const rect = renderer.domElement.getBoundingClientRect(); pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1); ray.setFromCamera(pointer, camera);
     };
-
-    const minAzimuth = -0.25; // ~-14 deg
-    const maxAzimuth = 1.85;  // ~106 deg (about 120 deg total safe view)
-
-    const onPointerMove = (e: PointerEvent) => {
-      const rect = renderer.domElement.getBoundingClientRect();
-      const mouse = new THREE.Vector2(
-        ((e.clientX - rect.left) / rect.width) * 2 - 1,
-        -((e.clientY - rect.top) / rect.height) * 2 + 1
-      );
-
-      if (isDragging) {
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
-        if (Math.abs(deltaX) > 4 || Math.abs(deltaY) > 4) {
-          hasMoved = true;
-        }
-
-        currentAzimuth += deltaX * 0.005;
-        // Clamp azimuth strictly as per design specification
-        currentAzimuth = Math.max(minAzimuth, Math.min(maxAzimuth, currentAzimuth));
-
-        camera.position.set(
-          initialDistance * Math.cos(initialPitch) * Math.sin(currentAzimuth),
-          initialDistance * Math.sin(initialPitch),
-          initialDistance * Math.cos(initialPitch) * Math.cos(currentAzimuth)
-        );
-        camera.lookAt(0, 0.4, 0);
-
-        if (onRotationChange) {
-          onRotationChange(currentAzimuth);
-        }
-
-        startX = e.clientX;
-        startY = e.clientY;
-      } else {
-        // Raycasting for hover feedback
-        const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(interactiveMeshes, true);
-
-        if (intersects.length > 0) {
-          let topInteractive: THREE.Object3D | null = intersects[0].object;
-          while (topInteractive && !topInteractive.userData.isInteractive && topInteractive.parent) {
-            topInteractive = topInteractive.parent;
-          }
-          const itemName = topInteractive?.userData.name || null;
-          setHoveredItem(itemName);
-          container.style.cursor = itemName ? 'pointer' : 'default';
-        } else {
-          setHoveredItem(null);
-          container.style.cursor = 'default';
-        }
-      }
-    };
-
-    const onPointerUp = (e: PointerEvent) => {
-      if (!hasMoved) {
-        // Click action!
+    const pick = (event: PointerEvent) => {
+      pointAt(event);
+      const hit = ray.intersectObjects(clickables, true)[0];
+      if (!hit) {
+        // Screen-space fallback provides a 44px touch target without making visible props oversized.
         const rect = renderer.domElement.getBoundingClientRect();
-        const mouse = new THREE.Vector2(
-          ((e.clientX - rect.left) / rect.width) * 2 - 1,
-          -((e.clientY - rect.top) / rect.height) * 2 + 1
-        );
-        const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(interactiveMeshes, true);
-
-        if (intersects.length > 0) {
-          let topInteractive: THREE.Object3D | null = intersects[0].object;
-          while (topInteractive && !topInteractive.userData.isInteractive && topInteractive.parent) {
-            topInteractive = topInteractive.parent;
-          }
-          const itemName = topInteractive?.userData.name;
-
-          if (itemName === 'window') {
-            stateRef.current.onToggleWindow();
-          } else if (itemName === 'lamp') {
-            stateRef.current.onToggleLamp();
-          } else if (itemName === 'computer') {
-            stateRef.current.onSelectModal('computer');
-          } else if (itemName === 'drawing') {
-            stateRef.current.onSelectModal('drawing');
-          } else if (itemName === 'game') {
-            stateRef.current.onSelectModal('game');
-          } else if (itemName === 'diy') {
-            stateRef.current.onSelectModal('diy');
-          } else if (itemName === 'tangle') {
-            stateRef.current.onSelectModal('tangle');
-          } else if (itemName === 'headphones') {
-            stateRef.current.onSelectModal('headphones');
-          } else if (itemName === 'atmosphere') {
-            stateRef.current.onSelectModal('atmosphere');
-          }
+        const candidates: { id: ObjectId; node?: number; point: THREE.Vector3; distance: number }[] = [];
+        for (const id of Object.keys(groups) as ObjectId[]) {
+          const center = groups[id].getWorldPosition(new THREE.Vector3());
+          if (id === 'computer') center.y += 0.4;
+          if (id === 'headphones') center.y += 0.4;
+          const projected = center.clone().project(camera);
+          const distance = Math.hypot((projected.x + 1) * rect.width / 2 - (event.clientX - rect.left), (-projected.y + 1) * rect.height / 2 - (event.clientY - rect.top));
+          candidates.push({ id, point: center, distance });
         }
+        if (selected === 'tangle') joints.forEach((joint, node) => {
+          const center = joint.getWorldPosition(new THREE.Vector3()), projected = center.clone().project(camera);
+          candidates.push({ id: 'tangle', node, point: center, distance: Math.hypot((projected.x + 1) * rect.width / 2 - (event.clientX - rect.left), (-projected.y + 1) * rect.height / 2 - (event.clientY - rect.top)) });
+        });
+        candidates.sort((a, b) => a.distance - b.distance);
+        return candidates[0]?.distance < 22 ? candidates[0] : null;
       }
-      isDragging = false;
+      let object: THREE.Object3D | null = hit.object;
+      while (object && !object.userData.id) object = object.parent;
+      return object ? { id: object.userData.id as string, node: hit.object.userData.node as number | undefined, point: hit.point } : null;
     };
-
-    const domElement = renderer.domElement;
-    domElement.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-
-    // --- Animation Loop ---
-    let animationFrameId: number;
-    let clock = new THREE.Clock();
-
-    const animate = () => {
-      animationFrameId = requestAnimationFrame(animate);
-      const delta = clock.getDelta();
-      const time = clock.getElapsedTime();
-
-      updateSceneAtmosphere();
-
-      // Animate particles
-      const positions = particleGeo.attributes.position.array as Float32Array;
-      const curWeather = stateRef.current.weather;
-
-      if (curWeather === 'rain' || curWeather === 'snow' || curWeather === 'autumn') {
-        const fallSpeed = curWeather === 'rain' ? 8.0 : curWeather === 'autumn' ? 1.5 : 1.2;
-        const driftSpeed = curWeather === 'autumn' ? Math.sin(time * 2) * 0.8 : Math.cos(time) * 0.2;
-
-        for (let i = 0; i < particleCount; i++) {
-          positions[i * 3 + 1] -= fallSpeed * delta;
-          positions[i * 3] += driftSpeed * delta;
-
-          // If reached bottom, reset to top
-          if (positions[i * 3 + 1] < 0) {
-            positions[i * 3 + 1] = 4.5 + Math.random();
-            positions[i * 3] = (Math.random() - 0.5) * 5 + 0.6;
+    type Gesture = { id: number; x: number; y: number; lastX: number; hit: ReturnType<typeof pick>; moved: boolean; rotate: boolean; start: Vec3; pose: ObjectPose | null; nodes: Vec3[] };
+    let gesture: Gesture | null = null;
+    const touches = new Map<number, number>();
+    const cancel = () => {
+      if (gesture?.hit && gesture.pose) { const id = gesture.hit.id as ObjectId; poses[id] = gesture.pose; nodes = gesture.nodes; drawTangle(); }
+      gesture = null; transition(selected, selected ? 'selected' : 'idle');
+    };
+    const onDown = (e: PointerEvent) => {
+      if (live.current.blocked) return;
+      if (e.pointerType === 'touch') touches.set(e.pointerId, e.clientX);
+      if (touches.size > 1) { cancel(); renderer.domElement.setPointerCapture(e.pointerId); return; }
+      const hit = pick(e), id = hit?.id as ObjectId;
+      const dragStart = hit?.point.clone() || new THREE.Vector3();
+      if (groups[id]) { plane.constant = -poses[id].position[1]; ray.ray.intersectPlane(plane, dragStart); }
+      gesture = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, hit, moved: false, rotate: e.button === 2 || e.shiftKey || rotationRef.current,
+        start: [dragStart.x, dragStart.y, dragStart.z], pose: groups[id] ? structuredClone(poses[id]) : null, nodes: nodes.map(n => [...n] as Vec3) };
+      renderer.domElement.setPointerCapture(e.pointerId);
+      if (groups[id]) { choose(id); transition(id, 'picked'); }
+    };
+    const onMove = (e: PointerEvent) => {
+      if (live.current.blocked) return;
+      if (touches.has(e.pointerId) && touches.size > 1) {
+        const old = touches.get(e.pointerId)!; touches.set(e.pointerId, e.clientX); yaw = clamp(yaw + (e.clientX - old) * 0.006, -0.26, 1.83); return;
+      }
+      if (!gesture || gesture.id !== e.pointerId) {
+        const hit = pick(e), id = hit?.id as ObjectId;
+        host.style.cursor = hit ? 'pointer' : 'grab';
+        if (!selected && phase !== (hit ? 'hover' : 'idle')) transition(groups[id] ? id : null, hit ? 'hover' : 'idle');
+        return;
+      }
+      const g = gesture, dx = e.clientX - g.lastX;
+      if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 7) g.moved = true;
+      g.lastX = e.clientX;
+      if (!g.moved) return;
+      const id = g.hit?.id as ObjectId;
+      if (groups[id] && g.pose) {
+        transition(id, 'manipulating');
+        if (g.rotate) { poses[id].rotation = Math.atan2(Math.sin(poses[id].rotation + dx * 0.016), Math.cos(poses[id].rotation + dx * 0.016)); }
+        else {
+          pointAt(e); plane.constant = -g.pose.position[1]; const world = new THREE.Vector3();
+          if (ray.ray.intersectPlane(plane, world)) {
+            if (id === 'tangle' && g.hit?.node !== undefined) {
+              tangle.updateMatrixWorld(); const local = tangle.worldToLocal(world.clone()); nodes = deformTangle(nodes, g.hit.node, [local.x, 0.03, local.z]); drawTangle();
+            } else {
+              const p = g.pose.position;
+              poses[id] = constrainPose(id, { position: [p[0] + world.x - g.start[0], p[1], p[2] + world.z - g.start[2]], rotation: poses[id].rotation }, poses);
+            }
           }
         }
-        particleGeo.attributes.position.needsUpdate = true;
-      }
+      } else if (!g.hit && e.pointerType !== 'touch') { yaw = clamp(yaw + dx * 0.006, -0.26, 1.83); }
+    };
+    const open = (id: string) => {
+      if (id === 'window') { live.current.onToggleWindow(); return; }
+      if (id === 'lamp') { live.current.onToggleLamp(); return; }
+      const modal: Record<string, ModalType> = { computer: 'computer', keyboard: 'computer', mouse: 'computer', tangle: 'tangle', headphones: 'headphones', game: 'game', tools: 'diy', drawing: 'drawing', diy: 'diy', atmosphere: 'headphones', about: 'about', 'mood-ai': 'mood-ai' };
+      live.current.onSelectModal(modal[id] || null);
+    };
+    const onUp = (e: PointerEvent) => {
+      const wasMulti = touches.size > 1; touches.delete(e.pointerId);
+      if (wasMulti) { live.current.onRotation(yaw); gesture = null; return; }
+      if (!gesture || gesture.id !== e.pointerId) return;
+      const g = gesture; gesture = null;
+      const id = g.hit?.id as ObjectId;
+      if (g.moved) {
+        if (groups[id]) { commit(id); if (id === 'tangle') live.current.onTangle(nodes.map(n => [...n] as Vec3)); transition(id, 'released'); if (id === 'headphones' || id === 'game') open(id); }
+        else live.current.onRotation(yaw);
+      } else if (g.hit && !g.rotate) { transition(groups[id] ? id : null, 'selected'); open(id); }
+      if (renderer.domElement.hasPointerCapture(e.pointerId)) renderer.domElement.releasePointerCapture(e.pointerId);
+    };
+    const onCancel = (e: PointerEvent) => { touches.delete(e.pointerId); cancel(); };
+    const onContext = (e: Event) => e.preventDefault();
+    const onKey = (e: KeyboardEvent) => {
+      if (!selected || live.current.blocked || /INPUT|TEXTAREA|SELECT/.test((e.target as HTMLElement)?.tagName)) return;
+      if (e.key === 'Escape') { cancel(); handle.current?.resetView(); }
+      const deltas: Record<string, [number, number]> = { ArrowLeft: [-0.08, 0], ArrowRight: [0.08, 0], ArrowUp: [0, -0.08], ArrowDown: [0, 0.08] };
+      if (deltas[e.key]) { e.preventDefault(); handle.current?.move(...deltas[e.key]); }
+      if (e.key.toLowerCase() === 'r') handle.current?.rotate(0.15);
+    };
+    const onLoss = (e: Event) => { e.preventDefault(); setFailed(true); };
+    const onBlur = () => { touches.clear(); if (gesture) cancel(); };
+    const el = renderer.domElement;
+    const pointerListener = (callback: (event: PointerEvent) => void): EventListener => event => {
+      if (event instanceof PointerEvent) callback(event);
+    };
+    const downListener = pointerListener(onDown), moveListener = pointerListener(onMove), upListener = pointerListener(onUp), cancelListener = pointerListener(onCancel);
+    el.addEventListener('pointerdown', downListener); el.addEventListener('pointermove', moveListener); el.addEventListener('pointerup', upListener); el.addEventListener('pointercancel', cancelListener); el.addEventListener('contextmenu', onContext); el.addEventListener('webglcontextlost', onLoss); window.addEventListener('keydown', onKey); window.addEventListener('blur', onBlur);
 
+    const resize = () => {
+      const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return;
+      const aspect = w / h, half = Math.max(5.2, 5.2 / aspect);
+      camera.left = -half * aspect; camera.right = half * aspect; camera.top = half; camera.bottom = -half;
+      camera.updateProjectionMatrix(); renderer.setSize(w, h);
+    };
+    const observer = new ResizeObserver(resize); observer.observe(host); resize();
+    const backgrounds = { sunny: 0xEFE8DC, rain: 0xDBE1DF, snow: 0xE2E8E4, autumn: 0xEDE1CF, night: 0x293A42 };
+    const skies = { sunny: 0xBFDED5, rain: 0x9EAFB8, snow: 0xD7E2E3, autumn: 0xE6CD9D, night: 0x23374C };
+    const weatherIndex = { sunny: 0, rain: 1, snow: 2, autumn: 3, night: 4 };
+    const background = new THREE.Color(backgrounds[props.state.weather]); scene.background = background;
+    const nextColor = new THREE.Color();
+    let lastTime = 0, frame = 0, lastRender = 0;
+    const animate = (milliseconds: number) => {
+      if (disposed) return; frame = requestAnimationFrame(animate);
+      if (document.hidden) { lastTime = milliseconds; return; }
+      if (software && milliseconds - lastRender < (live.current.blocked ? 350 : 65)) return;
+      lastRender = milliseconds;
+      const dt = Math.min(0.05, (milliseconds - lastTime) / 1000 || 0.016); lastTime = milliseconds;
+      const s = live.current.state, alpha = reduced.matches ? 1 : 1 - Math.exp(-dt * 6);
+      if (live.current.editTarget !== currentEdit) { currentEdit = live.current.editTarget; if (currentEdit) handle.current?.select(currentEdit); else if (selected) resetFocus(); }
+      if (s.tangleNodes !== previousNodes && !gesture) { previousNodes = s.tangleNodes; nodes = s.tangleNodes.map(p => [...p] as Vec3); drawTangle(); }
+      target.lerp(desiredTarget, alpha); zoom += (desiredZoom - zoom) * alpha; camera.zoom = zoom; camera.updateProjectionMatrix();
+      camera.position.set(target.x + Math.sin(yaw) * 16, target.y + 11.2, target.z + Math.cos(yaw) * 16); camera.lookAt(target);
+      leftWall.visible = Math.sin(yaw) > -0.01; back.visible = Math.cos(yaw) > -0.01;
+      for (const id of Object.keys(groups) as ObjectId[]) {
+        const g = groups[id]; const lifted = selected === id && (phase === 'picked' || phase === 'manipulating' || (live.current.blocked && (id === 'headphones' || id === 'game')));
+        const destination = new THREE.Vector3(...poses[id].position); destination.y += lifted ? 0.16 : 0;
+        g.position.lerp(destination, alpha); g.rotation.y = poses[id].rotation;
+        const scale = lifted ? 1.025 : 1; g.scale.lerp(new THREE.Vector3(scale, scale, scale), alpha);
+      }
+      background.lerp(nextColor.set(backgrounds[s.weather]), alpha * 0.3);
+      skyMaterial.uniforms.sky.value.lerp(nextColor.set(skies[s.weather]), alpha * 0.3);
+      simpleSky.color.lerp(nextColor.set(skies[s.weather]), alpha);
+      skyMaterial.uniforms.weather.value = weatherIndex[s.weather]; skyMaterial.uniforms.time.value = reduced.matches ? 0 : milliseconds / 1000;
+      ambient.intensity += ((s.weather === 'night' ? 0.65 : 2.1) - ambient.intensity) * alpha * 0.3;
+      sun.intensity += (({ sunny: 2.6, rain: 0.5, snow: 0.9, autumn: 2.3, night: 0.15 }[s.weather]) * (software ? 0.32 : 1) - sun.intensity) * alpha * 0.3;
+      sun.color.lerp(nextColor.set(s.weather === 'autumn' ? 0xFFD38A : s.weather === 'night' ? 0x8FAABC : 0xFFE5BE), alpha);
+      lampLight.position.copy(lamp.position).add(new THREE.Vector3(0.1, 0.5, 0)); lampLight.intensity += ((s.lampOn ? 3.5 : 0) - lampLight.intensity) * alpha;
+      bulb.visible = s.lampOn; screenMat.emissiveIntensity = s.weather === 'night' ? 0.7 : 0.2;
+      pane.position.x += ((s.windowOpen ? 1.08 : 0.59) - pane.position.x) * alpha;
+      sunlightMat.opacity += (((s.weather === 'sunny' || s.weather === 'autumn') ? 0.24 : 0) - sunlightMat.opacity) * alpha * 0.3;
+      sunCross.visible = !software && sunlightMat.opacity > 0.12;
+      curtain.rotation.z = reduced.matches ? 0 : s.windowOpen ? Math.sin(milliseconds / 1700) * 0.035 : 0;
+      dust.visible = !reduced.matches && !software && (s.weather === 'sunny' || s.weather === 'autumn');
+      if (dust.visible) { dust.position.x = Math.sin(milliseconds / 4200) * 0.04; dust.position.y = Math.sin(milliseconds / 2600) * 0.05; }
+      rain.visible = s.weather === 'rain'; snow.visible = s.weather === 'snow' && s.windowOpen;
+      if (rain.visible && !reduced.matches) {
+        for (let i = 0; i < 60; i++) { rainPoints[i * 3 + 1] -= dt * (0.2 + i % 4 * 0.1); if (rainPoints[i * 3 + 1] < 1.61) rainPoints[i * 3 + 1] = 3.25; }
+        rainGeometry.attributes.position.needsUpdate = true;
+      }
+      if (snow.visible && !reduced.matches) {
+        const a = snowGeometry.attributes.position.array as Float32Array;
+        for (let i = 0; i < 60; i++) { a[i * 3 + 1] -= dt * 0.2; a[i * 3 + 2] += dt * 0.06; if (a[i * 3 + 1] < 1.9 || a[i * 3 + 2] > -2.72) { a[i * 3 + 1] = 2.8 + Math.random() * 0.3; a[i * 3 + 2] = -3.06; } }
+        snowGeometry.attributes.position.needsUpdate = true;
+      }
       renderer.render(scene, camera);
     };
-
-    animate();
-
-    // --- Resize Handler ---
-    const handleResize = () => {
-      if (!container) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-      const asp = w / h;
-      camera.left = -d * asp;
-      camera.right = d * asp;
-      camera.top = d;
-      camera.bottom = -d;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-    };
-
-    window.addEventListener('resize', handleResize);
-
+    frame = requestAnimationFrame(animate);
     return () => {
-      cancelAnimationFrame(animationFrameId);
-      domElement.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('resize', handleResize);
-      renderer.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
-      }
+      disposed = true; cancelAnimationFrame(frame); observer.disconnect(); handle.current = null;
+      el.removeEventListener('pointerdown', downListener); el.removeEventListener('pointermove', moveListener); el.removeEventListener('pointerup', upListener); el.removeEventListener('pointercancel', cancelListener); el.removeEventListener('contextmenu', onContext); el.removeEventListener('webglcontextlost', onLoss); window.removeEventListener('keydown', onKey); window.removeEventListener('blur', onBlur);
+      geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); textures.forEach(t => t.dispose()); if (renderer instanceof THREE.WebGLRenderer) renderer.dispose(); el.remove();
     };
   }, []);
 
-  return (
-    <div className="relative w-full h-full select-none">
-      <div ref={containerRef} className="w-full h-full" />
-      
-      {/* Floating Hover Indicator Badge */}
-      {hoveredItem && (
-        <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-[#FAF7F0]/95 backdrop-blur-md border border-[#C9A47E]/40 text-[#34312E] text-xs font-medium shadow-md transition-all duration-150 flex items-center gap-1.5 animate-fade-in">
-          <span className="w-2 h-2 rounded-full bg-[#C98464] animate-pulse" />
-          <span>
-            {hoveredItem === 'computer' && '点击查看 · 个人作品集与项目'}
-            {hoveredItem === 'drawing' && '点击展开 · 涂鸦画板与灵感草稿'}
-            {hoveredItem === 'game' && '点击把玩 · 秋日接落叶轻量小游戏'}
-            {hoveredItem === 'diy' && '点击翻阅 · 手作与 DIY 记录'}
-            {hoveredItem === 'tangle' && '点击记录 · Tangle 随手灵感'}
-            {hoveredItem === 'headphones' && '点击聆听 · AirPods Max 声音入口'}
-            {hoveredItem === 'lamp' && (lampOn ? '点击关闭台灯' : '点击开启暖光台灯')}
-            {hoveredItem === 'window' && (windowOpen ? '点击关闭窗户' : '点击打开窗户')}
-            {hoveredItem === 'atmosphere' && '点击调节 · 空间氛围与声音'}
-          </span>
-        </div>
-      )}
-
-      {/* Rotation hint indicator */}
-      <div className="pointer-events-none absolute top-4 right-4 px-3 py-1 rounded-md bg-[#FAF7F0]/70 backdrop-blur-sm border border-[#C9A47E]/30 text-[#34312E]/70 text-[11px]">
-        ↔ 左右拖动旋转房间
+  return <section className="room-stage" aria-label="互动房间">
+    <div ref={containerRef} className="room-canvas" />
+    {simple && <span className="simple-label">简化渲染 · 交互仍可用</span>}
+    {failed ? <div className="room-fallback"><h2>换一种方式逛逛</h2><p>当前浏览器无法显示 3D 房间，作品、画板、声音和小游戏仍可打开。</p>{(['computer', 'drawing', 'tangle', 'headphones', 'game', 'diy'] as ModalType[]).map(id => <button key={id} className="soft-button" onClick={() => props.onSelectModal(id)}>{id === 'drawing' ? '画板' : id === 'diy' ? 'DIY' : names[id as ObjectId]}</button>)}</div> : <>
+      {guide && <div className="room-guide"><span className="eyebrow">MAKE YOURSELF AT HOME</span><h2>慢一点，也没关系。</h2><p>拖动空白转动房间，点击物件发现小事。</p><button onClick={() => setGuide(false)} aria-label="收起欢迎语">×</button></div>}
+      <div className="room-bottom-bar"><span>{interaction.id ? names[interaction.id] + ' · ' + phases[interaction.phase] : '鼠标拖动观察 · 手机上双指转动'}</span><button onClick={() => { handle.current?.resetView(); setGuide(true); }}>回到全景</button></div>
+      <div className="object-toolbar">
+        <label className="sr-only" htmlFor="object-picker">选择要操作的物件</label>
+        <select id="object-picker" value={interaction.id || ''} onChange={e => handle.current?.select(e.target.value as ObjectId)}><option value="" disabled>摆弄桌上的小物件</option>{Object.entries(names).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
+        {interaction.id && <><button className={rotateMode ? 'active' : ''} aria-pressed={rotateMode} onClick={() => setRotateMode(!rotateMode)}>{rotateMode ? '旋转模式' : '拖动模式'}</button><button onClick={() => handle.current?.rotate(0.26)} aria-label="将选中物件旋转十五度">↻</button><button onClick={() => handle.current?.reset()}>恢复原状</button><button onClick={() => handle.current?.resetView()} aria-label="退出物件编辑">×</button></>}
       </div>
-    </div>
-  );
+      {props.editTarget === 'tangle' && <div className="tangle-edit-tip">编辑 Tangle · 拖动橙色或粉色连接段改变形状<button onClick={() => handle.current?.resetView()}>完成</button></div>}
+    </>}
+  </section>;
 };

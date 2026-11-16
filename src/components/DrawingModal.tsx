@@ -13,6 +13,9 @@ export const DrawingModal: React.FC<DrawingModalProps> = ({ onClose }) => {
   const [isEraser, setIsEraser] = useState(false);
   const [history, setHistory] = useState<ImageData[]>([]);
   const [savedNotice, setSavedNotice] = useState(false);
+  const [exportUrl, setExportUrl] = useState('');
+  const [ready, setReady] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('正在恢复当前设备的草稿…');
 
   const colors = [
     { hex: '#34312E', name: '炭灰' },
@@ -39,19 +42,26 @@ export const DrawingModal: React.FC<DrawingModalProps> = ({ onClose }) => {
     ctx.fillStyle = '#FAF7F0';
     ctx.fillRect(0, 0, width, height);
 
-    // Load saved draft from IndexedDB
+    let active = true;
+    // Load before accepting strokes, so a late draft cannot overwrite a new drawing.
     loadDrawingDraft().then((saved) => {
+      if (!active) return;
       if (saved) {
         const img = new Image();
         img.onload = () => {
+          if (!active) return;
           ctx.drawImage(img, 0, 0);
-          saveHistory();
+          setHistory([ctx.getImageData(0, 0, width, height)]);
+          setReady(true); setSaveStatus('草稿已恢复 · 仅保存在当前设备');
         };
+        img.onerror = () => { if (active) { setReady(true); setSaveStatus('草稿暂时无法恢复，先导出重要画稿'); } };
         img.src = saved;
       } else {
-        saveHistory();
+        setHistory([ctx.getImageData(0, 0, width, height)]);
+        setReady(true); setSaveStatus('画稿仅保存在当前设备');
       }
     });
+    return () => { active = false; };
   }, []);
 
   const saveHistory = () => {
@@ -64,13 +74,15 @@ export const DrawingModal: React.FC<DrawingModalProps> = ({ onClose }) => {
 
     // Autosave to IndexedDB
     const dataUrl = canvas.toDataURL();
-    saveDrawingDraft(dataUrl);
+    setSaveStatus('正在保存…');
+    saveDrawingDraft(dataUrl).then(ok => setSaveStatus(ok ? '草稿已保存 · 仅在当前设备' : '当前设备无法保存，请导出 PNG'));
   };
 
   const isDrawing = useRef(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
 
   const startDraw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!ready) return;
     isDrawing.current = true;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -158,7 +170,10 @@ export const DrawingModal: React.FC<DrawingModalProps> = ({ onClose }) => {
     const link = document.createElement('a');
     link.download = `roomforone-doodle-${Date.now()}.png`;
     link.href = canvas.toDataURL('image/png');
+    setExportUrl(link.href);
+    document.body.appendChild(link);
     link.click();
+    link.remove();
     setSavedNotice(true);
     setTimeout(() => setSavedNotice(false), 2000);
   };
@@ -174,11 +189,12 @@ export const DrawingModal: React.FC<DrawingModalProps> = ({ onClose }) => {
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-[#91A58C]" />
             <h3 className="text-sm font-bold text-[#34312E]">
-              房间画板 · 涂鸦与草稿 (IndexedDB 自动保存)
+              房间画板 · 随手画几笔
             </h3>
           </div>
           <button
             onClick={onClose}
+            aria-label="关闭画板"
             className="p-1.5 rounded-full hover:bg-[#EFE8DC] text-[#34312E]/70 hover:text-[#34312E] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -203,6 +219,7 @@ export const DrawingModal: React.FC<DrawingModalProps> = ({ onClose }) => {
                 }`}
                 style={{ backgroundColor: c.hex }}
                 title={c.name}
+                aria-label={c.name}
               />
             ))}
           </div>
@@ -241,14 +258,14 @@ export const DrawingModal: React.FC<DrawingModalProps> = ({ onClose }) => {
               onClick={undo}
               disabled={history.length <= 1}
               className="p-1.5 rounded-lg bg-[#FAF7F0] border border-[#C9A47E]/30 hover:bg-white text-[#34312E] disabled:opacity-40 cursor-pointer"
-              title="撤销一步"
+              title="撤销一步" aria-label="撤销一步"
             >
               <Undo2 className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={clearCanvas}
               className="p-1.5 rounded-lg bg-[#FAF7F0] border border-[#C9A47E]/30 hover:bg-red-50 text-red-600 cursor-pointer"
-              title="清空画布"
+              title="清空画布" aria-label="清空画布"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -257,9 +274,10 @@ export const DrawingModal: React.FC<DrawingModalProps> = ({ onClose }) => {
               className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#91A58C] hover:bg-[#7F937A] text-white font-medium cursor-pointer transition-colors shadow-xs"
             >
               {savedNotice ? <Check className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
-              <span>{savedNotice ? '已导出' : '保存 PNG'}</span>
+              <span>{savedNotice ? '已生成 PNG' : '保存 PNG'}</span>
             </button>
           </div>
+          {exportUrl && <a className="text-xs underline text-[#825E3B]" href={exportUrl} download="roomforone-doodle.png">下载 PNG</a>}
         </div>
 
         {/* Canvas Area */}
@@ -274,13 +292,14 @@ export const DrawingModal: React.FC<DrawingModalProps> = ({ onClose }) => {
               onTouchStart={startDraw}
               onTouchMove={draw}
               onTouchEnd={endDraw}
-              className="w-full max-w-[560px] h-[360px] block touch-none cursor-crosshair"
+              aria-label="涂鸦画布"
+              className="w-full max-w-[560px] h-auto block touch-none cursor-crosshair"
             />
           </div>
         </div>
 
         <div className="px-6 py-2 bg-[#FAF7F0] border-t border-[#C9A47E]/15 text-[11px] text-[#34312E]/60 flex items-center justify-between">
-          <span>草稿已自动暂存在本地存储 (roomforone-local-v1)</span>
+          <span>{saveStatus}</span>
           <span>不上传任何外部服务器</span>
         </div>
       </div>

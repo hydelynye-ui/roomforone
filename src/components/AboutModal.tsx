@@ -22,6 +22,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
           </div>
           <button
             onClick={onClose}
+            aria-label="关闭关于页面"
             className="p-1.5 rounded-full hover:bg-[#EFE8DC] text-[#34312E]/70 hover:text-[#34312E] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -40,43 +41,11 @@ export const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
             </p>
           </div>
 
-          <div className="space-y-2">
-            <h5 className="font-bold text-[#34312E] flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-[#91A58C]" />
-              CloudBase 独立环境与数据隔离规范
-            </h5>
-            <div className="grid grid-cols-1 gap-2 text-[11px]">
-              <div className="p-2.5 rounded-xl bg-white border border-[#C9A47E]/20 flex items-center justify-between">
-                <span className="text-[#34312E]/70 flex items-center gap-1">
-                  <Layers className="w-3.5 h-3.5 text-[#C9A47E]" /> CloudBase 环境 ID
-                </span>
-                <code className="font-mono bg-[#EFE8DC] px-1.5 py-0.5 rounded text-[#34312E]">applicable-butterfly-d9ac7eb21be</code>
-              </div>
-              <div className="p-2.5 rounded-xl bg-white border border-[#C9A47E]/20 flex items-center justify-between">
-                <span className="text-[#34312E]/70 flex items-center gap-1">
-                  <Layers className="w-3.5 h-3.5 text-[#C9A47E]" /> 部署路径
-                </span>
-                <code className="font-mono bg-[#EFE8DC] px-1.5 py-0.5 rounded text-[#34312E]">/ (独立根路径)</code>
-              </div>
-              <div className="p-2.5 rounded-xl bg-white border border-[#C9A47E]/20 flex items-center justify-between">
-                <span className="text-[#34312E]/70 flex items-center gap-1">
-                  <Database className="w-3.5 h-3.5 text-[#C9A47E]" /> 本地 localStorage
-                </span>
-                <code className="font-mono bg-[#EFE8DC] px-1.5 py-0.5 rounded text-[#34312E]">roomforone-state-v1</code>
-              </div>
-              <div className="p-2.5 rounded-xl bg-white border border-[#C9A47E]/20 flex items-center justify-between">
-                <span className="text-[#34312E]/70 flex items-center gap-1">
-                  <Database className="w-3.5 h-3.5 text-[#C9A47E]" /> 本地 IndexedDB
-                </span>
-                <code className="font-mono bg-[#EFE8DC] px-1.5 py-0.5 rounded text-[#34312E]">roomforone-local-v1</code>
-              </div>
-              <div className="p-2.5 rounded-xl bg-white border border-[#C9A47E]/20 flex items-center justify-between">
-                <span className="text-[#34312E]/70 flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#91A58C]" /> 独立环境物理隔离
-                </span>
-                <span className="text-[#91A58C] font-semibold">100% 独立环境，与 Focus Space 彻底隔离</span>
-              </div>
-            </div>
+          <div className="space-y-3">
+            <h4 className="font-bold">这里的东西，可以慢慢摆弄。</h4>
+            <p>桌上的电脑、耳机、手柄、台灯和 Tangle 都可以拖动。右键拖动可以旋转；在手机上选择旋转模式。Tangle 的每一个连接段都可以拉动，双指用于转动房间。</p>
+            <p>画稿、灵感便签、物件摆放和声音偏好仅保存在当前设备。它们不会自动上传，也不会跨设备同步。清除浏览器数据前，请先导出重要画稿。</p>
+            <p>心情氛围目前是本地规则演示，不会把你的心情发送给外部模型；声音需要你主动开启。手作内容暂为明确标注的示例。</p>
           </div>
 
           <div className="pt-2 border-t border-[#C9A47E]/15 flex items-center justify-between text-[11px] text-[#34312E]/50">

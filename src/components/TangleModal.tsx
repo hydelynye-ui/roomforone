@@ -1,44 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Lightbulb, Plus, Trash2, X } from 'lucide-react';
 
-interface TangleNote {
-  id: string;
-  text: string;
-  createdAt: number;
-}
-
+import type { TangleNote } from '../types';
 interface TangleModalProps {
   onClose: () => void;
+  notes: TangleNote[];
+  onNotes: (notes: TangleNote[]) => void;
+  onEdit: () => void;
 }
 
-const STORAGE_KEY = 'roomforone-tangle-notes-v1';
-
-function loadNotes(): TangleNote[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is TangleNote => (
-      item && typeof item.id === 'string' && typeof item.text === 'string' && typeof item.createdAt === 'number'
-    ));
-  } catch {
-    return [];
-  }
-}
-
-export const TangleModal: React.FC<TangleModalProps> = ({ onClose }) => {
-  const [notes, setNotes] = useState<TangleNote[]>(loadNotes);
+export const TangleModal: React.FC<TangleModalProps> = ({ onClose, notes, onNotes, onEdit }) => {
   const [draft, setDraft] = useState('');
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
-    } catch {
-      // Keep the interaction usable if local persistence is unavailable.
-    }
-  }, [notes]);
-
   const sortedNotes = useMemo(
     () => [...notes].sort((a, b) => b.createdAt - a.createdAt),
     [notes],
@@ -47,15 +19,15 @@ export const TangleModal: React.FC<TangleModalProps> = ({ onClose }) => {
   const addNote = () => {
     const text = draft.trim();
     if (!text) return;
-    setNotes((current) => [
-      ...current,
+    onNotes([
+      ...notes,
       { id: `tangle-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, text, createdAt: Date.now() },
     ]);
     setDraft('');
   };
 
   const removeNote = (id: string) => {
-    setNotes((current) => current.filter((note) => note.id !== id));
+    onNotes(notes.filter((note) => note.id !== id));
   };
 
   return (
@@ -81,7 +53,7 @@ export const TangleModal: React.FC<TangleModalProps> = ({ onClose }) => {
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto"><button className="soft-button w-full" onClick={onEdit}>编辑 Tangle · 回到房间拖动连接段</button>
           <div className="p-4 rounded-2xl bg-[#EFE8DC]/55 border border-[#C9A47E]/20">
             <div className="flex items-center gap-2 mb-2">
               <Lightbulb className="w-4 h-4 text-[#C98464]" />
@@ -123,7 +95,7 @@ export const TangleModal: React.FC<TangleModalProps> = ({ onClose }) => {
                 <button
                   onClick={() => removeNote(note.id)}
                   aria-label="删除记录"
-                  className="shrink-0 rounded-lg p-1 text-[#34312E]/30 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 cursor-pointer"
+                  className="shrink-0 rounded-lg p-1 text-[#34312E]/30 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

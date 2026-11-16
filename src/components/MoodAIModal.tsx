@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Sparkles, Check, ArrowRight, Loader2 } from 'lucide-react';
 import { MoodAIRecommendation } from '../types';
 import { analyzeMood } from '../services/aiMoodService';
 
 interface MoodAIModalProps {
-  onApplyRecommendation: (rec: MoodAIRecommendation) => void;
+  onApplyRecommendation: (rec: MoodAIRecommendation, expectedRevision: number) => void;
+  sceneRevision: number;
   onClose: () => void;
 }
 
 export const MoodAIModal: React.FC<MoodAIModalProps> = ({
   onApplyRecommendation,
   onClose,
+  sceneRevision,
 }) => {
   const [inputMood, setInputMood] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,24 +26,26 @@ export const MoodAIModal: React.FC<MoodAIModalProps> = ({
     '心情很轻松，想开着窗吹吹微风听鸟鸣',
   ];
 
+  const requestId = useRef(0), mounted = useRef(true);
+  const revisionRef = useRef(sceneRevision); revisionRef.current = sceneRevision;
+  const [resultRevision, setResultRevision] = useState(sceneRevision);
+  const [error, setError] = useState('');
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; requestId.current++; }; }, []);
   const handleAnalyze = async (text: string) => {
     if (!text.trim()) return;
-    setLoading(true);
+    const id = ++requestId.current, originalRevision = revisionRef.current;
+    setLoading(true); setRecommendation(null); setError('');
     try {
       const rec = await analyzeMood(text);
-      setRecommendation(rec);
-    } catch (e) {
-      console.warn('AI analysis error', e);
-    } finally {
-      setLoading(false);
-    }
+      if (!mounted.current || id !== requestId.current) return;
+      setRecommendation(rec); setResultRevision(originalRevision);
+      if (originalRevision !== revisionRef.current) setError('等待时房间已调整，这份建议不会覆盖你的新选择。请重新生成。');
+    } catch { if (mounted.current && id === requestId.current) setError('暂时无法生成建议，请重试。房间没有改变。'); }
+    finally { if (mounted.current && id === requestId.current) setLoading(false); }
   };
-
   const handleApply = () => {
-    if (recommendation) {
-      onApplyRecommendation(recommendation);
-      onClose();
-    }
+    if (!recommendation || loading || resultRevision !== sceneRevision) return;
+    onApplyRecommendation(recommendation, resultRevision);
   };
 
   return (
@@ -60,6 +64,7 @@ export const MoodAIModal: React.FC<MoodAIModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="关闭心情氛围"
             className="p-1.5 rounded-full hover:bg-[#EFE8DC] text-[#34312E]/70 hover:text-[#34312E] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -73,14 +78,15 @@ export const MoodAIModal: React.FC<MoodAIModalProps> = ({
               今天想待在什么样的房间？
             </label>
             <p className="text-[11px] text-[#34312E]/60 mb-2.5">
-              输入你此时的心情、疲惫程度或喜欢的景象，AI 会为你调整光线、天气、窗户与桌面便签。
+              输入你此时的心情、疲惫程度或喜欢的景象，本地规则演示会组合天气、暖灯与声音建议；应用前可以先看一眼。
             </p>
             <div className="relative">
               <textarea
                 value={inputMood}
-                onChange={(e) => setInputMood(e.target.value)}
+                onChange={(e) => { setInputMood(e.target.value); setRecommendation(null); requestId.current++; setLoading(false); }}
                 placeholder="例如：今天有点累，想听雨，但不要太暗..."
                 rows={3}
+                maxLength={500}
                 className="w-full p-3.5 rounded-2xl bg-white border border-[#C9A47E]/30 text-xs text-[#34312E] focus:outline-none focus:border-[#C98464] resize-none shadow-inner"
               />
               <button
@@ -115,6 +121,7 @@ export const MoodAIModal: React.FC<MoodAIModalProps> = ({
             </div>
           </div>
 
+          {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
           {/* AI Result Card */}
           {recommendation && (
             <div className="p-4 rounded-2xl bg-[#FAF7F0] border-2 border-[#C98464]/30 space-y-3 animate-fade-in shadow-sm">
@@ -123,7 +130,7 @@ export const MoodAIModal: React.FC<MoodAIModalProps> = ({
                   <Sparkles className="w-3.5 h-3.5" /> 房间氛围调整建议
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#EFE8DC] text-[#34312E]/70">
-                  本地启发式智能引擎
+                  演示模式 · 本地规则
                 </span>
               </div>
 
@@ -143,7 +150,7 @@ export const MoodAIModal: React.FC<MoodAIModalProps> = ({
                   </strong>
                 </span>
                 <span className="px-2.5 py-1 rounded-lg bg-white border border-[#C9A47E]/20 text-[#34312E]">
-                  窗户: <strong>{recommendation.windowOpen ? '敞开透气' : '关紧隔音'}</strong>
+                  窗户: <strong>保留你的选择</strong>
                 </span>
                 <span className="px-2.5 py-1 rounded-lg bg-white border border-[#C9A47E]/20 text-[#34312E]">
                   台灯: <strong>{recommendation.lampOn ? '点亮暖光' : '自然日光'}</strong>
@@ -162,6 +169,7 @@ export const MoodAIModal: React.FC<MoodAIModalProps> = ({
 
               <button
                 onClick={handleApply}
+                disabled={loading || resultRevision !== sceneRevision}
                 className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[#C98464] hover:bg-[#B36F51] text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
               >
                 <Check className="w-4 h-4" />
@@ -173,7 +181,7 @@ export const MoodAIModal: React.FC<MoodAIModalProps> = ({
 
         {/* Footer */}
         <div className="px-6 py-2.5 bg-[#FAF7F0] border-t border-[#C9A47E]/15 text-[11px] text-[#34312E]/60 flex items-center justify-between">
-          <span>AI 建议不会自动强行开声，声音状态始终由您决定</span>
+          <span>应用建议时，窗户和静音保留你的选择</span>
           <button onClick={onClose} className="hover:underline cursor-pointer">
             取消
           </button>

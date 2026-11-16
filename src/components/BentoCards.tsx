@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sparkles, ArrowUpRight, Compass, Palette, Gamepad2, Hammer, Lightbulb, Headphones } from 'lucide-react';
+import { projects } from '../data/projects';
 import { ModalType } from '../types';
 
 interface BentoCardsProps {
@@ -14,11 +15,11 @@ export const BentoCards: React.FC<BentoCardsProps> = ({
   onOpenMoodAI,
 }) => {
   return (
-    <div className="absolute top-20 right-6 z-20 w-80 hidden xl:flex flex-col gap-4 pointer-events-auto select-none">
+    <div className="bento-sidebar">
       {/* 1. Mood Sticky Note Card (便签) */}
-      <div 
+      <button type="button"
         onClick={onOpenMoodAI}
-        className="paper-card p-4 rounded-2xl bg-[#FAF7F0] border border-[#C9A47E]/30 cursor-pointer hover:border-[#C98464]/60 transition-all duration-200 relative group overflow-hidden"
+        className="paper-card p-4 rounded-2xl bg-[#FAF7F0] border border-[#C9A47E]/30 cursor-pointer hover:border-[#C98464]/60 transition-all duration-200 relative group overflow-hidden text-left"
       >
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
@@ -36,7 +37,7 @@ export const BentoCards: React.FC<BentoCardsProps> = ({
           <span>点击写下今天的心情，让房间改变氛围</span>
           <ArrowUpRight className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
         </div>
-      </div>
+      </button>
 
       {/* 2. Room Identity & Introduction Bento */}
       <div className="paper-card p-4 rounded-2xl bg-[#FAF7F0] border border-[#C9A47E]/30">
@@ -46,7 +47,7 @@ export const BentoCards: React.FC<BentoCardsProps> = ({
           </div>
           <div>
             <h3 className="text-sm font-bold text-[#34312E]">YY 的自留地</h3>
-            <p className="text-[11px] text-[#34312E]/60">独立创作 · 代码 · 空间设计</p>
+            <p className="text-[11px] text-[#34312E]/60">做喜欢的事 · 留一点空白</p>
           </div>
         </div>
         <p className="text-xs text-[#34312E]/80 leading-relaxed mb-3">
@@ -97,6 +98,11 @@ export const BentoCards: React.FC<BentoCardsProps> = ({
           </button>
         </div>
       </div>
+      <button className="paper-card rounded-2xl p-4 text-left recent-card" onClick={() => onOpenModal('computer')}>
+        <span className="eyebrow">ON MY DESK / 正在做</span><h3 className="text-sm font-semibold mt-2">{projects[0].title} <span className="float-right">↗</span></h3>
+        <p className="text-xs text-[#34312E]/60 mt-2 leading-relaxed">{projects[0].subtitle}</p>
+        <div className="project-thumbnail"><span /><span /><span /></div>
+      </button>
     </div>
   );
 };
