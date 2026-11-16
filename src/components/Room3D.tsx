@@ -1,701 +1,268 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { WeatherPreset, ModalType } from '../types';
+import { ModalType, WeatherPreset } from '../types';
 
 interface Room3DProps {
   weather: WeatherPreset;
   windowOpen: boolean;
   lampOn: boolean;
+  computerOpen?: boolean;
   onSelectModal: (modal: ModalType) => void;
   onToggleWindow: () => void;
   onToggleLamp: () => void;
-  onRotationChange?: (angle: number) => void;
 }
 
-export const Room3D: React.FC<Room3DProps> = ({
-  weather,
-  windowOpen,
-  lampOn,
-  onSelectModal,
-  onToggleWindow,
-  onToggleLamp,
-  onRotationChange,
-}) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+type InteractionName = 'computer' | 'window' | 'lamp' | 'game' | 'drawing' | 'diy' | 'atmosphere' | 'tangle';
 
-  // References to keep Three.js state synced without full re-render
-  const stateRef = useRef({
-    weather,
-    windowOpen,
-    lampOn,
-    onSelectModal,
-    onToggleWindow,
-    onToggleLamp,
-  });
+export const Room3D: React.FC<Room3DProps> = ({ weather, windowOpen, lampOn, computerOpen = false, onSelectModal, onToggleWindow, onToggleLamp }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [hoveredItem, setHoveredItem] = useState<InteractionName | null>(null);
+  const stateRef = useRef({ weather, windowOpen, lampOn, computerOpen, onSelectModal, onToggleWindow, onToggleLamp });
 
   useEffect(() => {
-    stateRef.current = {
-      weather,
-      windowOpen,
-      lampOn,
-      onSelectModal,
-      onToggleWindow,
-      onToggleLamp,
-    };
-  }, [weather, windowOpen, lampOn, onSelectModal, onToggleWindow, onToggleLamp]);
+    stateRef.current = { weather, windowOpen, lampOn, computerOpen, onSelectModal, onToggleWindow, onToggleLamp };
+  }, [weather, windowOpen, lampOn, computerOpen, onSelectModal, onToggleWindow, onToggleLamp]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // --- Scene, Camera, Renderer ---
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xEFE8DC);
+    scene.background = new THREE.Color(0xeee7da);
+    const aspect = Math.max(container.clientWidth / Math.max(container.clientHeight, 1), 1);
+    const view = 5.25;
+    const camera = new THREE.OrthographicCamera(-view * aspect, view * aspect, view, -view, 0.1, 100);
+    const distance = 19;
+    const pitch = 0.52;
+    let azimuth = 0.82;
+    const aim = new THREE.Vector3(0, 0.72, -0.1);
+    const placeCamera = () => {
+      camera.position.set(distance * Math.cos(pitch) * Math.sin(azimuth), distance * Math.sin(pitch), distance * Math.cos(pitch) * Math.cos(azimuth));
+      camera.lookAt(aim);
+    };
+    placeCamera();
 
-    const aspect = container.clientWidth / container.clientHeight;
-    const d = 5.2;
-    const camera = new THREE.OrthographicCamera(
-      -d * aspect, d * aspect, d, -d, 1, 100
-    );
-
-    // Initial isometric view
-    const initialDistance = 20;
-    const initialPitch = 0.55; // ~31 degrees
-    let currentAzimuth = 0.785; // 45 degrees
-    
-    camera.position.set(
-      initialDistance * Math.cos(initialPitch) * Math.sin(currentAzimuth),
-      initialDistance * Math.sin(initialPitch),
-      initialDistance * Math.cos(initialPitch) * Math.cos(currentAzimuth)
-    );
-    camera.lookAt(0, 0.4, 0);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
 
-    // --- Interactive Objects Map ---
     const interactiveMeshes: THREE.Object3D[] = [];
-    const registerInteractive = (obj: THREE.Object3D, name: string) => {
-      obj.userData = { isInteractive: true, name };
-      obj.traverse((child) => {
-        child.userData = { isInteractive: true, name };
+    const registerInteractive = (object: THREE.Object3D, name: InteractionName) => {
+      object.userData.isInteractive = true;
+      object.userData.name = name;
+      object.traverse((child) => {
+        child.userData.isInteractive = true;
+        child.userData.name = name;
         if (child instanceof THREE.Mesh) {
           child.castShadow = true;
           child.receiveShadow = true;
         }
       });
-      interactiveMeshes.push(obj);
-      scene.add(obj);
+      interactiveMeshes.push(object);
+      scene.add(object);
     };
 
-    // --- Lighting ---
-    const ambientLight = new THREE.AmbientLight(0xfff6ea, 1.2);
-    scene.add(ambientLight);
+    const palette = {
+      ivory: 0xf5efe5,
+      paper: 0xfaf7f0,
+      wood: 0xc9a47e,
+      darkWood: 0x76563e,
+      sage: 0x91a58c,
+      terracotta: 0xc98464,
+      charcoal: 0x3d4140,
+      glass: 0xc9dce0,
+      sky: 0xbfd6dd,
+    };
+    const mat = (color: number, roughness = 0.82, flatShading = true) => new THREE.MeshStandardMaterial({ color, roughness, flatShading });
+    const matIvory = mat(palette.ivory);
+    const matPaper = mat(palette.paper);
+    const matWood = mat(palette.wood, 0.7);
+    const matDarkWood = mat(palette.darkWood, 0.76);
+    const matSage = mat(palette.sage, 0.86);
+    const matTerracotta = mat(palette.terracotta, 0.76);
+    const matCharcoal = mat(palette.charcoal, 0.38, false);
+    const matGlass = new THREE.MeshPhysicalMaterial({ color: palette.glass, transparent: true, opacity: 0.32, roughness: 0.22, transmission: 0.35 });
+    const screenMat = new THREE.MeshBasicMaterial({ color: 0x293239 });
 
-    const sunLight = new THREE.DirectionalLight(0xffedd5, 1.8);
-    sunLight.position.set(-6, 9, -2);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 30;
-    sunLight.shadow.camera.left = -6;
-    sunLight.shadow.camera.right = 6;
-    sunLight.shadow.camera.top = 6;
-    sunLight.shadow.camera.bottom = -6;
-    sunLight.shadow.bias = -0.0005;
-    scene.add(sunLight);
-
-    // Desk Lamp Point Light
-    const lampLight = new THREE.PointLight(0xffaa44, 0, 4);
-    lampLight.position.set(-0.8, 1.6, -1.1);
+    const ambient = new THREE.AmbientLight(0xfff5e9, 1.35);
+    scene.add(ambient);
+    const sun = new THREE.DirectionalLight(0xffe8ca, 2.1);
+    sun.position.set(5, 8, 2);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.left = -7; sun.shadow.camera.right = 7; sun.shadow.camera.top = 7; sun.shadow.camera.bottom = -5;
+    scene.add(sun);
+    const lampLight = new THREE.PointLight(0xffb45d, 0, 5);
+    lampLight.position.set(-1.2, 2.15, -1.4);
     lampLight.castShadow = true;
     scene.add(lampLight);
 
-    // --- Materials Palette ---
-    const matWall = new THREE.MeshStandardMaterial({ color: 0xF5F0E6, roughness: 0.8 });
-    const matFloor = new THREE.MeshStandardMaterial({ color: 0xD7B896, roughness: 0.6 });
-    const matWood = new THREE.MeshStandardMaterial({ color: 0xB58756, roughness: 0.5 });
-    const matDarkWood = new THREE.MeshStandardMaterial({ color: 0x825E3B, roughness: 0.5 });
-    const matScreen = new THREE.MeshBasicMaterial({ color: 0x22272E });
-    const matSage = new THREE.MeshStandardMaterial({ color: 0x91A58C, roughness: 0.6 });
-    const matTerracotta = new THREE.MeshStandardMaterial({ color: 0xC98464, roughness: 0.5 });
-    const matMetal = new THREE.MeshStandardMaterial({ color: 0x4A4E54, metalness: 0.8, roughness: 0.2 });
-    const matGlass = new THREE.MeshPhysicalMaterial({
-      color: 0xE8F4F8,
-      transparent: true,
-      opacity: 0.35,
-      roughness: 0.1,
-      transmission: 0.8,
-    });
+    // Open floor and soft platform; no enclosing walls.
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.28, 6.4), mat(palette.wood, 0.92));
+    floor.position.y = -0.14; floor.receiveShadow = true; scene.add(floor);
+    const rug = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.025, 2.6), mat(0xe5ddd0, 0.98));
+    rug.position.set(-0.1, 0.02, 0.85); rug.receiveShadow = true; scene.add(rug);
+    const platformEdge = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.08, 0.18), matDarkWood);
+    platformEdge.position.set(0, 0.08, 3.08); scene.add(platformEdge);
 
-    // --- Room Shell (Floor & 2 Walls) ---
-    // Floor
-    const floorGeo = new THREE.BoxGeometry(6.4, 0.3, 6.4);
-    const floor = new THREE.Mesh(floorGeo, matFloor);
-    floor.position.set(0, -0.15, 0);
-    floor.receiveShadow = true;
-    scene.add(floor);
+    // Right-side open window with a stylized 3D landscape behind it.
+    const outdoor = new THREE.Group();
+    outdoor.position.set(3.02, 2.15, -0.6);
+    outdoor.rotation.y = -Math.PI / 2;
+    const sky = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 2.3), mat(palette.sky, 0.98));
+    outdoor.add(sky);
+    const distantGround = new THREE.Mesh(new THREE.ConeGeometry(2.3, 1.15, 5), mat(0xa6b19e, 0.95));
+    distantGround.scale.set(1.9, 0.55, 0.7); distantGround.position.set(0.15, -0.75, 0.05); outdoor.add(distantGround);
+    const hill = new THREE.Mesh(new THREE.ConeGeometry(1.6, 0.9, 5), mat(0x879a87, 0.95));
+    hill.scale.set(1.25, 0.6, 0.6); hill.position.set(-1.1, -0.68, -0.05); outdoor.add(hill);
+    for (let i = 0; i < 5; i += 1) {
+      const tree = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 0.55, 6), matDarkWood);
+      trunk.position.y = -0.45;
+      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(0.32 + (i % 2) * 0.08, 0), mat(i % 2 ? 0x778c78 : 0x96a88e, 0.98));
+      crown.position.y = -0.02;
+      tree.add(trunk, crown);
+      tree.position.set(-1.35 + i * 0.7, -0.25 + (i % 2) * 0.12, -0.08 - i * 0.02);
+      outdoor.add(tree);
+    }
+    for (let i = 0; i < 4; i += 1) {
+      const cloud = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22 + i * 0.025, 0), mat(0xf7f5ef, 0.99));
+      cloud.scale.set(1.4, 0.55, 0.7);
+      cloud.position.set(-1.1 + i * 0.68, 0.6 + (i % 2) * 0.18, -0.1);
+      outdoor.add(cloud);
+    }
+    scene.add(outdoor);
 
-    // Cozy Rug
-    const rugGeo = new THREE.BoxGeometry(3.0, 0.02, 2.6);
-    const matRug = new THREE.MeshStandardMaterial({ color: 0xE6DFD3, roughness: 0.9 });
-    const rug = new THREE.Mesh(rugGeo, matRug);
-    rug.position.set(0.4, 0.01, 0.8);
-    rug.receiveShadow = true;
-    scene.add(rug);
-
-    // Back Wall (Z = -3.2)
-    const backWallGeo = new THREE.BoxGeometry(6.4, 4.2, 0.25);
-    const backWall = new THREE.Mesh(backWallGeo, matWall);
-    backWall.position.set(0, 1.95, -3.2);
-    backWall.receiveShadow = true;
-    scene.add(backWall);
-
-    // Left Wall (X = -3.2)
-    const leftWallGeo = new THREE.BoxGeometry(0.25, 4.2, 6.4);
-    const leftWall = new THREE.Mesh(leftWallGeo, matWall);
-    leftWall.position.set(-3.2, 1.95, 0);
-    leftWall.receiveShadow = true;
-    scene.add(leftWall);
-
-    // Skirting boards
-    const skirtGeo1 = new THREE.BoxGeometry(6.4, 0.16, 0.08);
-    const skirt1 = new THREE.Mesh(skirtGeo1, matDarkWood);
-    skirt1.position.set(0, 0.08, -3.05);
-    scene.add(skirt1);
-
-    const skirtGeo2 = new THREE.BoxGeometry(0.08, 0.16, 6.4);
-    const skirt2 = new THREE.Mesh(skirtGeo2, matDarkWood);
-    skirt2.position.set(-3.05, 0.08, 0);
-    scene.add(skirt2);
-
-    // --- Window on Back Wall ---
     const windowGroup = new THREE.Group();
-    windowGroup.position.set(0.6, 2.3, -3.06);
-
-    const frameOuterGeo = new THREE.BoxGeometry(2.4, 1.8, 0.1);
-    const frameOuter = new THREE.Mesh(frameOuterGeo, matWood);
-    windowGroup.add(frameOuter);
-
-    // Glass panes
-    const glassPaneGeo = new THREE.BoxGeometry(1.05, 1.5, 0.02);
-    const leftGlass = new THREE.Mesh(glassPaneGeo, matGlass);
-    leftGlass.position.set(-0.55, 0, 0);
-    windowGroup.add(leftGlass);
-
-    const rightGlass = new THREE.Mesh(glassPaneGeo, matGlass);
-    rightGlass.position.set(0.55, 0, 0);
-    windowGroup.add(rightGlass);
-
-    // Window sill with a small potted plant
-    const sillGeo = new THREE.BoxGeometry(2.6, 0.08, 0.35);
-    const sill = new THREE.Mesh(sillGeo, matDarkWood);
-    sill.position.set(0, -0.9, 0.15);
-    sill.castShadow = true;
-    windowGroup.add(sill);
-
-    // Pot
-    const potGeo = new THREE.CylinderGeometry(0.12, 0.09, 0.18, 16);
-    const pot = new THREE.Mesh(potGeo, matTerracotta);
-    pot.position.set(0.9, -0.76, 0.15);
-    windowGroup.add(pot);
-
-    const plantLeavesGeo = new THREE.SphereGeometry(0.16, 12, 12);
-    const plantLeaves = new THREE.Mesh(plantLeavesGeo, matSage);
-    plantLeaves.position.set(0.9, -0.62, 0.15);
-    plantLeaves.scale.set(1, 1.4, 0.9);
-    windowGroup.add(plantLeaves);
-
+    windowGroup.position.set(2.55, 2.15, -0.6);
+    windowGroup.rotation.y = -Math.PI / 2;
+    const windowFrame = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.9, 0.12), matWood);
+    const pane = new THREE.Mesh(new THREE.BoxGeometry(2.15, 1.55, 0.03), matGlass);
+    pane.position.z = 0.07;
+    const mullionV = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.55, 0.08), matWood);
+    mullionV.position.z = 0.1;
+    const mullionH = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.07, 0.08), matWood);
+    mullionH.position.z = 0.1;
+    const sill = new THREE.Mesh(new THREE.BoxGeometry(2.75, 0.1, 0.38), matDarkWood);
+    sill.position.set(0, -1, 0.18);
+    windowGroup.add(windowFrame, pane, mullionV, mullionH, sill);
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.1, 0.2, 7), matTerracotta);
+    pot.position.set(0.78, -0.8, 0.2);
+    const plant = new THREE.Mesh(new THREE.IcosahedronGeometry(0.24, 0), matSage);
+    plant.position.set(0.78, -0.56, 0.2); plant.scale.set(0.8, 1.4, 0.8);
+    windowGroup.add(pot, plant);
     registerInteractive(windowGroup, 'window');
 
-    // --- Work Desk & Computer ---
-    const deskGroup = new THREE.Group();
-    deskGroup.position.set(-0.2, 0, -1.8);
+    // Desk, monitor, and tactile desktop objects.
+    const desk = new THREE.Group();
+    desk.position.set(-0.55, 0, -1.5);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.13, 1.55), matWood);
+    top.position.y = 1.28;
+    desk.add(top);
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.075, 1.28, 6), matDarkWood);
+    [[-1.38, -0.6], [1.38, -0.6], [-1.38, 0.6], [1.38, 0.6]].forEach(([x, z]) => { const copy = leg.clone(); copy.position.set(x, 0.64, z); desk.add(copy); });
 
-    // Desk Tabletop
-    const tableTopGeo = new THREE.BoxGeometry(2.6, 0.1, 1.3);
-    const tableTop = new THREE.Mesh(tableTopGeo, matWood);
-    tableTop.position.set(0, 1.15, 0);
-    tableTop.castShadow = true;
-    tableTop.receiveShadow = true;
-    deskGroup.add(tableTop);
+    const monitor = new THREE.Group();
+    monitor.position.set(-0.2, 1.35, -0.18);
+    const monitorBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.78, 0.08), matCharcoal,);
+    monitorBody.position.y = 0.48;
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.08, 0.62), screenMat);
+    screen.position.set(0, 0.48, 0.045);
+    const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.1, 0.3, 6), matCharcoal);
+    stand.position.y = 0.12;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.04, 0.24), matCharcoal);
+    base.position.set(0, -0.02, 0.02);
+    monitor.add(monitorBody, screen, stand, base);
+    desk.add(monitor);
+    const keyboard = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.045, 0.22), matPaper);
+    keyboard.position.set(-0.18, 1.38, 0.44); desk.add(keyboard);
+    const mouseObject = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 5), matSage);
+    mouseObject.scale.set(0.75, 0.4, 1); mouseObject.position.set(0.35, 1.4, 0.44); desk.add(mouseObject);
+    registerInteractive(desk, 'computer');
 
-    // Desk Legs
-    const legGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.15, 12);
-    [
-      [-1.15, 0.575, -0.5],
-      [1.15, 0.575, -0.5],
-      [-1.15, 0.575, 0.5],
-      [1.15, 0.575, 0.5],
-    ].forEach(([lx, ly, lz]) => {
-      const leg = new THREE.Mesh(legGeo, matDarkWood);
-      leg.position.set(lx, ly, lz);
-      leg.castShadow = true;
-      deskGroup.add(leg);
-    });
+    // Lamp.
+    const lamp = new THREE.Group(); lamp.position.set(-1.25, 1.32, -0.38);
+    const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.06, 8), matSage);
+    const lampStem = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.52, 6), matCharcoal); lampStem.position.y = 0.28; lampStem.rotation.z = -0.22;
+    const lampHead = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.28, 6), matSage); lampHead.position.set(0.12, 0.58, 0); lampHead.rotation.z = 2.1;
+    lamp.add(lampBase, lampStem, lampHead); registerInteractive(lamp, 'lamp');
 
-    // Computer Monitor
-    const monitorGroup = new THREE.Group();
-    monitorGroup.position.set(-0.15, 1.2, -0.2);
-
-    const monitorStand = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.08, 0.25, 12), matMetal);
-    monitorStand.position.set(0, 0.125, 0);
-    monitorGroup.add(monitorStand);
-
-    const monitorBody = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.65, 0.05), matMetal);
-    monitorBody.position.set(0, 0.45, 0);
-    monitorGroup.add(monitorBody);
-
-    const monitorScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.92, 0.57), matScreen);
-    monitorScreen.position.set(0, 0.45, 0.026);
-    monitorGroup.add(monitorScreen);
-
-    // Keyboard & Mouse
-    const keyboard = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, 0.18), matWall);
-    keyboard.position.set(0, 0.01, 0.35);
-    monitorGroup.add(keyboard);
-
-    const mouse = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.12), matSage);
-    mouse.position.set(0.38, 0.01, 0.35);
-    monitorGroup.add(mouse);
-
-    deskGroup.add(monitorGroup);
-    registerInteractive(deskGroup, 'computer');
-
-    // Desk Chair
-    const chairGroup = new THREE.Group();
-    chairGroup.position.set(-0.35, 0, -0.8);
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.7), matSage);
-    seat.position.set(0, 0.68, 0);
-    chairGroup.add(seat);
-    const backRest = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 0.08), matSage);
-    backRest.position.set(0, 1.05, 0.32);
-    chairGroup.add(backRest);
-    const chairLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.68, 12), matMetal);
-    chairLeg.position.set(0, 0.34, 0);
-    chairGroup.add(chairLeg);
-    scene.add(chairGroup);
-
-    // --- Desk Lamp (Interactive toggle) ---
-    const lampGroup = new THREE.Group();
-    lampGroup.position.set(-1.0, 1.2, -0.3);
-
-    const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.04, 16), matSage);
-    lampBase.position.set(0, 0.02, 0);
-    lampGroup.add(lampBase);
-
-    const lampStem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.45, 8), matMetal);
-    lampStem.position.set(0, 0.24, 0);
-    lampStem.rotation.z = -0.2;
-    lampGroup.add(lampStem);
-
-    const lampHead = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.22, 16), matSage);
-    lampHead.position.set(0.12, 0.46, 0);
-    lampHead.rotation.z = 2.1;
-    lampGroup.add(lampHead);
-
-    registerInteractive(lampGroup, 'lamp');
-
-    // --- Gamepad on the Desk Corner ---
-    const gamepadGroup = new THREE.Group();
-    gamepadGroup.position.set(0.75, 1.21, 0.25);
-    gamepadGroup.rotation.y = -0.3;
-
-    const gamepadBody = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.18), matTerracotta);
-    gamepadGroup.add(gamepadBody);
-
-    const dpad = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.02, 0.06), matMetal);
-    dpad.position.set(-0.08, 0.03, 0);
-    gamepadGroup.add(dpad);
-
-    const buttonA = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 8), matSage);
-    buttonA.position.set(0.08, 0.03, 0);
-    gamepadGroup.add(buttonA);
-
-    registerInteractive(gamepadGroup, 'game');
-
-    // --- Radio / Speaker on Shelf/Desk ---
-    const radioGroup = new THREE.Group();
-    radioGroup.position.set(0.9, 1.22, -0.4);
-    radioGroup.rotation.y = 0.2;
-
-    const radioBody = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.22, 0.14), matDarkWood);
-    radioGroup.add(radioBody);
-
-    const speakerGrill = new THREE.Mesh(new THREE.CircleGeometry(0.07, 16), matMetal);
-    speakerGrill.position.set(-0.07, 0, 0.071);
-    radioGroup.add(speakerGrill);
-
-    const radioDial = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.02, 12), matTerracotta);
-    radioDial.position.set(0.08, 0.04, 0.071);
-    radioDial.rotation.x = Math.PI / 2;
-    radioGroup.add(radioDial);
-
-    registerInteractive(radioGroup, 'atmosphere');
-
-    // --- Easel / Drawing Board (Right corner) ---
-    const easelGroup = new THREE.Group();
-    easelGroup.position.set(2.0, 0, 0.8);
-    easelGroup.rotation.y = -0.55;
-
-    // Easel tripod legs
-    const tripodLegGeo = new THREE.CylinderGeometry(0.03, 0.03, 2.5, 8);
-    const legLeft = new THREE.Mesh(tripodLegGeo, matWood);
-    legLeft.position.set(-0.4, 1.25, 0);
-    legLeft.rotation.z = -0.15;
-    easelGroup.add(legLeft);
-
-    const legRight = new THREE.Mesh(tripodLegGeo, matWood);
-    legRight.position.set(0.4, 1.25, 0);
-    legRight.rotation.z = 0.15;
-    easelGroup.add(legRight);
-
-    const legBack = new THREE.Mesh(tripodLegGeo, matWood);
-    legBack.position.set(0, 1.25, -0.6);
-    legBack.rotation.x = -0.28;
-    easelGroup.add(legBack);
-
-    // Canvas board
-    const canvasBoard = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.5, 0.06), matWall);
-    canvasBoard.position.set(0, 1.45, 0);
-    canvasBoard.rotation.x = -0.12;
-    easelGroup.add(canvasBoard);
-
-    // Palette with colors on easel shelf
-    const palette = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.02, 16), matWood);
-    palette.position.set(0.15, 0.72, 0.2);
-    easelGroup.add(palette);
-
-    registerInteractive(easelGroup, 'drawing');
-
-    // --- DIY Workbench & Pegboard (Left Wall) ---
-    const diyGroup = new THREE.Group();
-    diyGroup.position.set(-3.0, 0, 1.2);
-
-    // Small workbench cabinet
-    const benchCabinet = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.1, 1.6), matDarkWood);
-    benchCabinet.position.set(0.18, 0.55, 0);
-    diyGroup.add(benchCabinet);
-
-    // Wall Pegboard
-    const pegboard = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.4, 1.6), matWood);
-    pegboard.position.set(0.02, 1.9, 0);
-    diyGroup.add(pegboard);
-
-    // Hanging tools (Small hammer, scissors, ruler models)
-    const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.35, 0.12), matMetal);
-    hammer.position.set(0.07, 2.0, -0.4);
-    diyGroup.add(hammer);
-
-    const scissors = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.25, 0.08), matTerracotta);
-    scissors.position.set(0.07, 1.9, 0.1);
-    diyGroup.add(scissors);
-
-    registerInteractive(diyGroup, 'diy');
-
-    // --- Weather Particles Outside Window ---
-    const particleCount = 200;
-    const particleGeo = new THREE.BufferGeometry();
-    const particlePositions = new Float32Array(particleCount * 3);
-    const particleVelocities = new Float32Array(particleCount * 3);
-
-    for (let i = 0; i < particleCount; i++) {
-      particlePositions[i * 3] = (Math.random() - 0.5) * 5 + 0.6;
-      particlePositions[i * 3 + 1] = Math.random() * 5 + 0.5;
-      particlePositions[i * 3 + 2] = -3.5 - Math.random() * 2;
-
-      particleVelocities[i * 3] = 0;
-      particleVelocities[i * 3 + 1] = -0.05;
-      particleVelocities[i * 3 + 2] = 0;
+    // Low-poly tangle with simple segment deformation on drag.
+    const tangle = new THREE.Group(); tangle.position.set(0.58, 1.45, 0.25);
+    const tangleSegments: THREE.Mesh[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      const segment = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.055, 6, 10), mat(i % 2 ? 0xd18a78 : 0xe6a1a0, 0.72));
+      segment.rotation.set(0.4 + i * 0.08, i * 0.35, i * 0.16); segment.position.set(Math.sin(i * 1.1) * 0.13, Math.cos(i * 0.8) * 0.1, (i - 2.5) * 0.08);
+      tangleSegments.push(segment); tangle.add(segment);
     }
+    registerInteractive(tangle, 'tangle');
 
-    particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-    const particleMat = new THREE.PointsMaterial({
-      size: 0.08,
-      color: 0x90CDF4,
-      transparent: true,
-      opacity: 0.7,
-    });
-    const particleSystem = new THREE.Points(particleGeo, particleMat);
-    scene.add(particleSystem);
+    // Controller.
+    const controller = new THREE.Group(); controller.position.set(1.1, 1.4, 0.34); controller.rotation.y = -0.32;
+    const controllerBody = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.1, 0.28), matTerracotta); controller.add(controllerBody);
+    const dpad = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.035, 0.1), matCharcoal); dpad.position.x = -0.13; dpad.position.y = 0.06; controller.add(dpad);
+    const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.035, 8), matSage); btn.position.set(0.13, 0.07, 0); controller.add(btn);
+    registerInteractive(controller, 'game');
 
-    // --- Update Visuals Based on Weather & Lamps ---
-    const updateSceneAtmosphere = () => {
-      const cur = stateRef.current;
-      
-      // Lamp point light
-      lampLight.intensity = cur.lampOn ? 3.0 : 0;
-      lampLight.color.setHex(0xffaa44);
+    // Drawing board and DIY shelf.
+    const board = new THREE.Group(); board.position.set(1.95, 0, 0.7); board.rotation.y = -0.4;
+    const boardPanel = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.35, 0.08), matPaper); boardPanel.position.y = 1.4; board.add(boardPanel);
+    const boardLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 2.4, 6), matWood); boardLeg.position.y = 1.1; boardLeg.rotation.z = -0.08; board.add(boardLeg);
+    registerInteractive(board, 'drawing');
+    const diy = new THREE.Group(); diy.position.set(-2.25, 0, 0.7);
+    const cabinet = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.05, 0.85), matDarkWood); cabinet.position.y = 0.53; diy.add(cabinet);
+    const pegboard = new THREE.Mesh(new THREE.BoxGeometry(0.76, 1.1, 0.08), matWood); pegboard.position.set(0, 1.75, -0.4); diy.add(pegboard);
+    for (let i = 0; i < 4; i += 1) { const tool = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.28 + (i % 2) * 0.12, 0.05), i % 2 ? matTerracotta : matCharcoal); tool.position.set(-0.25 + i * 0.16, 1.78 + (i % 2) * 0.1, -0.34); diy.add(tool); }
+    registerInteractive(diy, 'diy');
+    const speaker = new THREE.Group(); speaker.position.set(1.1, 1.43, -0.38);
+    speaker.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.24, 0.17), matDarkWood), new THREE.Mesh(new THREE.CircleGeometry(0.07, 8), matCharcoal));
+    registerInteractive(speaker, 'atmosphere');
 
-      // Window position
-      rightGlass.position.x = cur.windowOpen ? 0.95 : 0.55;
+    // Weather particles stay outside the window and share the same geometric language.
+    const particleCount = 130;
+    const positions = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount; i += 1) { positions[i * 3] = 2.7 + Math.random() * 1.25; positions[i * 3 + 1] = 0.1 + Math.random() * 4.3; positions[i * 3 + 2] = -1.8 + Math.random() * 2.5; }
+    const particleGeo = new THREE.BufferGeometry(); particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const particleMat = new THREE.PointsMaterial({ color: 0x8ab8d2, size: 0.075, transparent: true, opacity: 0 });
+    const particles = new THREE.Points(particleGeo, particleMat); scene.add(particles);
 
-      switch (cur.weather) {
-        case 'sunny':
-          scene.background = new THREE.Color(0xEFE8DC);
-          ambientLight.color.setHex(0xfff5ea);
-          ambientLight.intensity = 1.3;
-          sunLight.color.setHex(0xfff3db);
-          sunLight.intensity = 1.9;
-          sunLight.position.set(-6, 9, -2);
-          monitorScreen.material = new THREE.MeshBasicMaterial({ color: 0x24292E });
-          particleMat.opacity = 0; // No rain/snow in sunny
-          break;
-
-        case 'rain':
-          scene.background = new THREE.Color(0xD8DEE9);
-          ambientLight.color.setHex(0xc0c8d4);
-          ambientLight.intensity = 0.9;
-          sunLight.color.setHex(0x9ca3af);
-          sunLight.intensity = 0.6;
-          particleMat.opacity = 0.75;
-          particleMat.color.setHex(0x60A5FA);
-          particleMat.size = 0.06;
-          break;
-
-        case 'snow':
-          scene.background = new THREE.Color(0xE2E8F0);
-          ambientLight.color.setHex(0xced8e5);
-          ambientLight.intensity = 0.85;
-          sunLight.color.setHex(0xa0aec0);
-          sunLight.intensity = 0.7;
-          particleMat.opacity = 0.9;
-          particleMat.color.setHex(0xFFFFFF);
-          particleMat.size = 0.12;
-          break;
-
-        case 'autumn':
-          scene.background = new THREE.Color(0xF3E5D8);
-          ambientLight.color.setHex(0xfce8d5);
-          ambientLight.intensity = 1.1;
-          sunLight.color.setHex(0xf59e0b);
-          sunLight.intensity = 1.6;
-          sunLight.position.set(-7, 6, -3);
-          particleMat.opacity = 0.85;
-          particleMat.color.setHex(0xD97706); // Golden leaves
-          particleMat.size = 0.14;
-          break;
-
-        case 'night':
-          scene.background = new THREE.Color(0x1E222A);
-          ambientLight.color.setHex(0x283042);
-          ambientLight.intensity = 0.45;
-          sunLight.color.setHex(0x3B4A6B);
-          sunLight.intensity = 0.2;
-          monitorScreen.material = new THREE.MeshBasicMaterial({ color: 0x60A5FA });
-          particleMat.opacity = 0;
-          break;
-      }
+    const updateAtmosphere = () => {
+      const current = stateRef.current;
+      lampLight.intensity = current.lampOn ? 3.1 : 0;
+      screenMat.color.setHex(current.computerOpen ? 0x7fc3d1 : current.weather === 'night' ? 0x587a92 : 0x293239);
+      const night = current.weather === 'night';
+      if (current.weather === 'rain') { scene.background = new THREE.Color(0xb8c7cc); ambient.color.setHex(0xd4e1df); ambient.intensity = 0.92; sun.color.setHex(0x9eabb1); sun.intensity = 0.7; particleMat.color.setHex(0x86b4ca); particleMat.opacity = 0.72; particleMat.size = 0.055; }
+      else if (current.weather === 'snow') { scene.background = new THREE.Color(0xd9e0de); ambient.color.setHex(0xe2ece8); ambient.intensity = 1.0; sun.color.setHex(0xc3d4d3); sun.intensity = 0.9; particleMat.color.setHex(0xf8faf7); particleMat.opacity = 0.86; particleMat.size = 0.105; }
+      else if (current.weather === 'autumn') { scene.background = new THREE.Color(0xe5d2b9); ambient.color.setHex(0xf2dfc7); ambient.intensity = 1.12; sun.color.setHex(0xf2ae65); sun.intensity = 1.5; particleMat.color.setHex(0xc88457); particleMat.opacity = 0.68; particleMat.size = 0.12; }
+      else if (night) { scene.background = new THREE.Color(0x25343e); ambient.color.setHex(0x8ea1a3); ambient.intensity = 0.43; sun.color.setHex(0x6f8291); sun.intensity = 0.2; particleMat.opacity = 0; }
+      else { scene.background = new THREE.Color(0xeee7da); ambient.color.setHex(0xfff5e9); ambient.intensity = 1.35; sun.color.setHex(0xffe8ca); sun.intensity = 2.1; particleMat.opacity = 0; }
+      const windowFactor = current.windowOpen ? 1 : 0.48;
+      matGlass.opacity = current.windowOpen ? 0.25 : 0.45;
+      outdoor.visible = true;
+      scene.userData.windowFactor = windowFactor;
     };
 
-    // --- Interaction & Drag to Rotate (Design Spec: 100°~140° range) ---
-    let isDragging = false;
-    let startX = 0;
-    let startY = 0;
-    let hasMoved = false;
+    let pointerDown = false; let draggingTangle = false; let moved = false; let lastX = 0; let lastY = 0; let downTarget: InteractionName | null = null;
+    const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2();
+    const intersect = (event: PointerEvent) => { const rect = renderer.domElement.getBoundingClientRect(); pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1); raycaster.setFromCamera(pointer, camera); const hit = raycaster.intersectObjects(interactiveMeshes, true)[0]; if (!hit) return null; let node: THREE.Object3D | null = hit.object; while (node && !node.userData.isInteractive && node.parent) node = node.parent; return (node?.userData.name as InteractionName | undefined) ?? null; };
+    const onPointerDown = (event: PointerEvent) => { pointerDown = true; moved = false; lastX = event.clientX; lastY = event.clientY; downTarget = intersect(event); draggingTangle = downTarget === 'tangle'; renderer.domElement.setPointerCapture?.(event.pointerId); };
+    const onPointerMove = (event: PointerEvent) => { const target = pointerDown ? downTarget : intersect(event); setHoveredItem(target); renderer.domElement.style.cursor = target ? 'pointer' : 'grab'; if (!pointerDown) return; const dx = event.clientX - lastX; const dy = event.clientY - lastY; if (Math.abs(event.clientX - lastX) > 2 || Math.abs(event.clientY - lastY) > 2) moved = true; if (draggingTangle) { tangle.rotation.y += dx * 0.018; tangle.rotation.x = THREE.MathUtils.clamp(tangle.rotation.x + dy * 0.008, -0.45, 0.45); } else { azimuth = THREE.MathUtils.clamp(azimuth + dx * 0.005, 0.25, 1.45); placeCamera(); } lastX = event.clientX; lastY = event.clientY; };
+    const onPointerUp = (event: PointerEvent) => { if (pointerDown && !moved && downTarget) { if (downTarget === 'window') stateRef.current.onToggleWindow(); else if (downTarget === 'lamp') stateRef.current.onToggleLamp(); else if (downTarget === 'computer') stateRef.current.onSelectModal('computer'); else if (downTarget === 'drawing') stateRef.current.onSelectModal('drawing'); else if (downTarget === 'game') stateRef.current.onSelectModal('game'); else if (downTarget === 'diy') stateRef.current.onSelectModal('diy'); else if (downTarget === 'atmosphere') stateRef.current.onSelectModal('atmosphere'); else if (downTarget === 'tangle') { tangle.rotation.z += 0.45; } } pointerDown = false; draggingTangle = false; downTarget = null; renderer.domElement.releasePointerCapture?.(event.pointerId); };
+    renderer.domElement.addEventListener('pointerdown', onPointerDown); renderer.domElement.addEventListener('pointermove', onPointerMove); renderer.domElement.addEventListener('pointerup', onPointerUp); renderer.domElement.addEventListener('pointerleave', () => setHoveredItem(null));
 
-    const onPointerDown = (e: PointerEvent) => {
-      isDragging = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      hasMoved = false;
-    };
-
-    const minAzimuth = 0.25;  // ~14 deg
-    const maxAzimuth = 1.45;  // ~83 deg (~70 deg total range, centered around 45)
-
-    const onPointerMove = (e: PointerEvent) => {
-      const rect = renderer.domElement.getBoundingClientRect();
-      const mouse = new THREE.Vector2(
-        ((e.clientX - rect.left) / rect.width) * 2 - 1,
-        -((e.clientY - rect.top) / rect.height) * 2 + 1
-      );
-
-      if (isDragging) {
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
-        if (Math.abs(deltaX) > 4 || Math.abs(deltaY) > 4) {
-          hasMoved = true;
-        }
-
-        currentAzimuth += deltaX * 0.005;
-        // Clamp azimuth strictly as per design specification
-        currentAzimuth = Math.max(minAzimuth, Math.min(maxAzimuth, currentAzimuth));
-
-        camera.position.set(
-          initialDistance * Math.cos(initialPitch) * Math.sin(currentAzimuth),
-          initialDistance * Math.sin(initialPitch),
-          initialDistance * Math.cos(initialPitch) * Math.cos(currentAzimuth)
-        );
-        camera.lookAt(0, 0.4, 0);
-
-        if (onRotationChange) {
-          onRotationChange(currentAzimuth);
-        }
-
-        startX = e.clientX;
-        startY = e.clientY;
-      } else {
-        // Raycasting for hover feedback
-        const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(interactiveMeshes, true);
-
-        if (intersects.length > 0) {
-          let topInteractive: THREE.Object3D | null = intersects[0].object;
-          while (topInteractive && !topInteractive.userData.isInteractive && topInteractive.parent) {
-            topInteractive = topInteractive.parent;
-          }
-          const itemName = topInteractive?.userData.name || null;
-          setHoveredItem(itemName);
-          container.style.cursor = itemName ? 'pointer' : 'default';
-        } else {
-          setHoveredItem(null);
-          container.style.cursor = 'default';
-        }
-      }
-    };
-
-    const onPointerUp = (e: PointerEvent) => {
-      if (!hasMoved) {
-        // Click action!
-        const rect = renderer.domElement.getBoundingClientRect();
-        const mouse = new THREE.Vector2(
-          ((e.clientX - rect.left) / rect.width) * 2 - 1,
-          -((e.clientY - rect.top) / rect.height) * 2 + 1
-        );
-        const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(interactiveMeshes, true);
-
-        if (intersects.length > 0) {
-          let topInteractive: THREE.Object3D | null = intersects[0].object;
-          while (topInteractive && !topInteractive.userData.isInteractive && topInteractive.parent) {
-            topInteractive = topInteractive.parent;
-          }
-          const itemName = topInteractive?.userData.name;
-
-          if (itemName === 'window') {
-            stateRef.current.onToggleWindow();
-          } else if (itemName === 'lamp') {
-            stateRef.current.onToggleLamp();
-          } else if (itemName === 'computer') {
-            stateRef.current.onSelectModal('computer');
-          } else if (itemName === 'drawing') {
-            stateRef.current.onSelectModal('drawing');
-          } else if (itemName === 'game') {
-            stateRef.current.onSelectModal('game');
-          } else if (itemName === 'diy') {
-            stateRef.current.onSelectModal('diy');
-          } else if (itemName === 'atmosphere') {
-            stateRef.current.onSelectModal('atmosphere');
-          }
-        }
-      }
-      isDragging = false;
-    };
-
-    const domElement = renderer.domElement;
-    domElement.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-
-    // --- Animation Loop ---
-    let animationFrameId: number;
-    let clock = new THREE.Clock();
-
-    const animate = () => {
-      animationFrameId = requestAnimationFrame(animate);
-      const delta = clock.getDelta();
-      const time = clock.getElapsedTime();
-
-      updateSceneAtmosphere();
-
-      // Animate particles
-      const positions = particleGeo.attributes.position.array as Float32Array;
-      const curWeather = stateRef.current.weather;
-
-      if (curWeather === 'rain' || curWeather === 'snow' || curWeather === 'autumn') {
-        const fallSpeed = curWeather === 'rain' ? 8.0 : curWeather === 'autumn' ? 1.5 : 1.2;
-        const driftSpeed = curWeather === 'autumn' ? Math.sin(time * 2) * 0.8 : Math.cos(time) * 0.2;
-
-        for (let i = 0; i < particleCount; i++) {
-          positions[i * 3 + 1] -= fallSpeed * delta;
-          positions[i * 3] += driftSpeed * delta;
-
-          // If reached bottom, reset to top
-          if (positions[i * 3 + 1] < 0) {
-            positions[i * 3 + 1] = 4.5 + Math.random();
-            positions[i * 3] = (Math.random() - 0.5) * 5 + 0.6;
-          }
-        }
-        particleGeo.attributes.position.needsUpdate = true;
-      }
-
-      renderer.render(scene, camera);
-    };
-
+    let animationId = 0; let clock = new THREE.Clock();
+    const animate = () => { animationId = requestAnimationFrame(animate); const delta = clock.getDelta(); const elapsed = clock.getElapsedTime(); updateAtmosphere(); const current = stateRef.current.weather; if (particleMat.opacity > 0) { const array = particleGeo.attributes.position.array as Float32Array; for (let i = 0; i < particleCount; i += 1) { array[i * 3 + 1] -= delta * (current === 'rain' ? 3.8 : current === 'autumn' ? 1.0 : 0.72); array[i * 3 + 2] += Math.sin(elapsed + i) * delta * 0.05; if (array[i * 3 + 1] < 0) array[i * 3 + 1] = 4.2; } particleGeo.attributes.position.needsUpdate = true; } tangleSegments.forEach((segment, index) => { segment.rotation.x += Math.sin(elapsed * 0.7 + index) * delta * 0.08; }); renderer.render(scene, camera); };
     animate();
 
-    // --- Resize Handler ---
-    const handleResize = () => {
-      if (!container) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-      const asp = w / h;
-      camera.left = -d * asp;
-      camera.right = d * asp;
-      camera.top = d;
-      camera.bottom = -d;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      domElement.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('resize', handleResize);
-      renderer.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
-      }
-    };
+    const resize = () => { const w = container.clientWidth; const h = Math.max(container.clientHeight, 1); const nextAspect = w / h; camera.left = -view * nextAspect; camera.right = view * nextAspect; camera.updateProjectionMatrix(); renderer.setSize(w, h); };
+    window.addEventListener('resize', resize);
+    return () => { cancelAnimationFrame(animationId); window.removeEventListener('resize', resize); renderer.domElement.removeEventListener('pointerdown', onPointerDown); renderer.domElement.removeEventListener('pointermove', onPointerMove); renderer.domElement.removeEventListener('pointerup', onPointerUp); renderer.dispose(); particleGeo.dispose(); particleMat.dispose(); if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement); };
   }, []);
 
-  return (
-    <div className="relative w-full h-full select-none">
-      <div ref={containerRef} className="w-full h-full" />
-      
-      {/* Floating Hover Indicator Badge */}
-      {hoveredItem && (
-        <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-[#FAF7F0]/95 backdrop-blur-md border border-[#C9A47E]/40 text-[#34312E] text-xs font-medium shadow-md transition-all duration-150 flex items-center gap-1.5 animate-fade-in">
-          <span className="w-2 h-2 rounded-full bg-[#C98464] animate-pulse" />
-          <span>
-            {hoveredItem === 'computer' && '点击查看 · 个人作品集与项目'}
-            {hoveredItem === 'drawing' && '点击展开 · 涂鸦画板与灵感草稿'}
-            {hoveredItem === 'game' && '点击把玩 · 秋日接落叶轻量小游戏'}
-            {hoveredItem === 'diy' && '点击翻阅 · 手作与 DIY 记录'}
-            {hoveredItem === 'lamp' && (lampOn ? '点击关闭台灯' : '点击开启暖光台灯')}
-            {hoveredItem === 'window' && (windowOpen ? '点击关闭窗户' : '点击打开窗户')}
-            {hoveredItem === 'atmosphere' && '点击调节 · 空间氛围与声音'}
-          </span>
-        </div>
-      )}
-
-      {/* Rotation hint indicator */}
-      <div className="pointer-events-none absolute top-4 right-4 px-3 py-1 rounded-md bg-[#FAF7F0]/70 backdrop-blur-sm border border-[#C9A47E]/30 text-[#34312E]/70 text-[11px]">
-        ↔ 左右拖动旋转房间
-      </div>
-    </div>
-  );
+  const labels: Record<InteractionName, string> = { computer: 'Enter the desktop portfolio', window: windowOpen ? 'Close the window' : 'Open the window', lamp: lampOn ? 'Turn off the warm lamp' : 'Turn on the warm lamp', game: 'Pick up the controller', drawing: 'Open the drawing board', diy: 'Browse the making shelf', atmosphere: 'Tune the room atmosphere', tangle: 'Drag to reshape the tangle' };
+  return <div className="relative h-full w-full select-none"><div ref={containerRef} className="h-full w-full" />{hoveredItem && <div className="pointer-events-none absolute bottom-7 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/70 bg-[#faf7f0]/88 px-4 py-2 text-xs font-medium text-[#34312e] shadow-lg backdrop-blur-md"><span className="h-2 w-2 animate-pulse rounded-full bg-[#c98464]" />{labels[hoveredItem]}</div>}<div className="pointer-events-none absolute bottom-6 left-5 rounded-full border border-white/50 bg-[#faf7f0]/60 px-3 py-1.5 text-[10px] uppercase tracking-[.18em] text-[#34312e]/55 backdrop-blur-sm">Drag to look around · select an object</div></div>;
 };

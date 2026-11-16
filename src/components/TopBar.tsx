@@ -11,13 +11,19 @@ import {
   Maximize2,
   Minimize2
 } from 'lucide-react';
-import { WeatherPreset, RoomState } from '../types';
+import { CityConfig, WeatherPreset, RoomState } from '../types';
 
 interface TopBarProps {
   roomState: RoomState;
   onSetWeather: (preset: WeatherPreset) => void;
+  onUseLiveWeather: () => void;
   onToggleMute: () => void;
   onOpenMoodAI: () => void;
+  onOpenCityPicker: () => void;
+  timeLabel: string;
+  timePhase: string;
+  city: CityConfig;
+  isRefreshingWeather: boolean;
   zenMode: boolean;
   onToggleZenMode: () => void;
 }
@@ -25,8 +31,14 @@ interface TopBarProps {
 export const TopBar: React.FC<TopBarProps> = ({
   roomState,
   onSetWeather,
+  onUseLiveWeather,
   onToggleMute,
   onOpenMoodAI,
+  onOpenCityPicker,
+  timeLabel,
+  timePhase,
+  city,
+  isRefreshingWeather,
   zenMode,
   onToggleZenMode,
 }) => {
@@ -40,7 +52,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <header className="fixed top-0 left-0 right-0 z-30 h-14 px-4 md:px-6 flex items-center justify-between pointer-events-none select-none">
-      {/* Brand title */}
+      {/* Brand title and local time */}
       <div className="flex items-center gap-3 pointer-events-auto">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-[#FAF7F0] border border-[#C9A47E]/30 flex items-center justify-center shadow-sm">
@@ -55,10 +67,22 @@ export const TopBar: React.FC<TopBarProps> = ({
             </p>
           </div>
         </div>
+        <button onClick={onOpenCityPicker} className="hidden sm:block text-left rounded-xl px-3 py-1.5 transition hover:bg-[#FAF7F0]/70" title="Change city">
+          <div className="text-[10px] uppercase tracking-[.18em] text-[#34312E]/45">{city.name} · {timePhase}</div>
+          <div className="text-sm font-semibold tracking-tight text-[#34312E] tabular-nums">{timeLabel}</div>
+        </button>
       </div>
 
       {/* Center Weather Quick Toggles */}
       <div className="hidden lg:flex items-center gap-1.5 p-1 rounded-full bg-[#FAF7F0]/85 backdrop-blur-md border border-[#C9A47E]/30 shadow-sm pointer-events-auto">
+        <button
+          onClick={onUseLiveWeather}
+          className={`flex items-center gap-1 px-3 py-1 rounded-full text-[11px] transition-all ${roomState.weatherMode !== 'manual' ? 'bg-[#91A58C] text-white' : 'text-[#34312E]/55 hover:bg-[#EFE8DC]'}`}
+          title="Use current weather"
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${isRefreshingWeather ? 'animate-ping bg-white' : 'bg-current'}`} />
+          Live
+        </button>
         {presets.map((p) => {
           const isActive = roomState.weather === p.id;
           return (
@@ -88,6 +112,10 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           <Sparkles className="w-3.5 h-3.5 text-[#C98464] animate-pulse" />
           <span className="hidden sm:inline">心情氛围</span>
+        </button>
+
+        <button onClick={onOpenCityPicker} className="hidden md:flex items-center rounded-full border border-[#C9A47E]/30 bg-[#FAF7F0]/80 px-3 py-1.5 text-[11px] text-[#34312E]/70 shadow-sm transition hover:bg-white">
+          {city.name}
         </button>
 
         {/* Master Sound Button */}

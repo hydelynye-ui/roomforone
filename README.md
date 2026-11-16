@@ -76,6 +76,16 @@ roomforone/
 
 ---
 
+## 当前视觉与交互版本
+
+The current build follows the uploaded cardboard and paper render direction: a consistent stylized 3D language, matte materials, soft directional light, controlled contact shadows, and an open room without enclosing walls. The right-side window contains a low-poly outdoor environment that responds to weather presets and live city weather.
+
+Clicking the physical computer enters a modern portfolio desktop layer with functional application windows for Projects, Photos, About Me, Experience, Journey, Contact, and Archive. The desktop remains sharp and readable and can be closed without resetting the room state.
+
+首次进入时会选择城市；城市、时间和天气状态沿用现有本地存储键，天气请求失败时保留最后一次成功结果。完整部署交接见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
+
+---
+
 ## 四、本地开发与构建
 
 ### 1. 安装依赖

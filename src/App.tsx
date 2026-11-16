@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Room3D } from './components/Room3D';
 import { TopBar } from './components/TopBar';
 import { BentoCards } from './components/BentoCards';
@@ -10,27 +10,68 @@ import { DIYModal } from './components/DIYModal';
 import { AtmosphereModal } from './components/AtmosphereModal';
 import { MoodAIModal } from './components/MoodAIModal';
 import { AboutModal } from './components/AboutModal';
+import { CityPicker } from './components/CityPicker';
 
-import { WeatherPreset, ModalType, RoomState, MoodAIRecommendation } from './types';
+import { CityConfig, WeatherPreset, ModalType, RoomState, MoodAIRecommendation } from './types';
 import { loadRoomState, saveRoomState } from './services/storage';
 import { audioEngine } from './services/audioEngine';
+import { DEFAULT_CITY, fetchWeather, getTimeLabel, getTimePhase } from './services/weatherService';
 
 export const App: React.FC = () => {
   const [roomState, setRoomState] = useState<RoomState>(loadRoomState);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
-  const [zenMode, setZenMode] = useState<boolean>(false);
+  const [zenMode, setZenMode] = useState(false);
+  const [showCityPicker, setShowCityPicker] = useState(!roomState.city);
+  const [now, setNow] = useState(() => new Date());
+  const [isRefreshingWeather, setIsRefreshingWeather] = useState(false);
 
-  // Sync audio engine on state changes
+  const selectedCity = roomState.city ?? DEFAULT_CITY;
+  const timeLabel = useMemo(() => getTimeLabel(selectedCity, now), [selectedCity, now]);
+  const timePhase = useMemo(() => getTimePhase(selectedCity, now), [selectedCity, now]);
+
   useEffect(() => {
-    audioEngine.updatePreset(
-      roomState.weather,
-      roomState.windowOpen,
-      roomState.volumeWeather,
-      roomState.volumeAmbient
-    );
+    const interval = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const refreshWeather = useCallback(async (city: CityConfig) => {
+    setIsRefreshingWeather(true);
+    try {
+      const snapshot = await fetchWeather(city);
+      setRoomState((prev) => {
+        const next = { ...prev, city, actualWeather: snapshot, weather: prev.weatherMode === 'manual' ? prev.weather : snapshot.preset };
+        saveRoomState(next);
+        return next;
+      });
+    } catch (error) {
+      console.warn('[roomforone] Weather refresh failed; keeping the last successful state.', error);
+    } finally {
+      setIsRefreshingWeather(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!roomState.city) return;
+    void refreshWeather(roomState.city);
+    const interval = window.setInterval(() => void refreshWeather(roomState.city as CityConfig), 15 * 60 * 1000);
+    return () => window.clearInterval(interval);
+  }, [roomState.city?.id, refreshWeather]);
+
+  useEffect(() => {
+    audioEngine.updatePreset(roomState.weather, roomState.windowOpen, roomState.volumeWeather, roomState.volumeAmbient);
   }, [roomState.weather, roomState.windowOpen, roomState.volumeWeather, roomState.volumeAmbient]);
 
-  // Handle master mute toggle
+  const handleSelectCity = useCallback((city: CityConfig | null) => {
+    const chosen = city ?? DEFAULT_CITY;
+    setShowCityPicker(false);
+    setRoomState((prev) => {
+      const next = { ...prev, city: chosen, weatherMode: 'live' as const };
+      saveRoomState(next);
+      return next;
+    });
+    if (city) void refreshWeather(city);
+  }, [refreshWeather]);
+
   const handleToggleMute = useCallback(() => {
     setRoomState((prev) => {
       const nextMute = !prev.masterMute;
@@ -40,15 +81,23 @@ export const App: React.FC = () => {
     });
   }, []);
 
-  // Weather switch
   const handleSetWeather = useCallback((preset: WeatherPreset) => {
     setRoomState((prev) => {
-      saveRoomState({ weather: preset });
-      return { ...prev, weather: preset };
+      const next = { ...prev, weather: preset, weatherMode: 'manual' as const };
+      saveRoomState({ weather: preset, weatherMode: 'manual' });
+      return next;
     });
   }, []);
 
-  // Window toggle
+  const handleUseLiveWeather = useCallback(() => {
+    setRoomState((prev) => {
+      const preset = prev.actualWeather?.preset ?? 'sunny';
+      const next = { ...prev, weather: preset, weatherMode: 'live' as const };
+      saveRoomState({ weather: preset, weatherMode: 'live' });
+      return next;
+    });
+  }, []);
+
   const handleToggleWindow = useCallback(() => {
     setRoomState((prev) => {
       const nextOpen = !prev.windowOpen;
@@ -57,7 +106,6 @@ export const App: React.FC = () => {
     });
   }, []);
 
-  // Lamp toggle
   const handleToggleLamp = useCallback(() => {
     setRoomState((prev) => {
       const nextLamp = !prev.lampOn;
@@ -66,7 +114,6 @@ export const App: React.FC = () => {
     });
   }, []);
 
-  // Volume slider update
   const handleUpdateVolume = useCallback((type: 'weather' | 'ambient', val: number) => {
     setRoomState((prev) => {
       const updates = type === 'weather' ? { volumeWeather: val } : { volumeAmbient: val };
@@ -75,108 +122,68 @@ export const App: React.FC = () => {
     });
   }, []);
 
-  // AI Mood recommendation application
   const handleApplyMoodAI = useCallback((rec: MoodAIRecommendation) => {
     setRoomState((prev) => {
-      const next: RoomState = {
-        ...prev,
-        weather: rec.weather,
-        windowOpen: rec.windowOpen,
-        lampOn: rec.lampOn,
-        volumeWeather: rec.volumeWeather,
-        volumeAmbient: rec.volumeAmbient,
-        stickyNote: rec.roomNote,
-      };
+      const next: RoomState = { ...prev, weather: rec.weather, weatherMode: 'manual', windowOpen: rec.windowOpen, lampOn: rec.lampOn, volumeWeather: rec.volumeWeather, volumeAmbient: rec.volumeAmbient, stickyNote: rec.roomNote };
       saveRoomState(next);
       return next;
     });
   }, []);
 
-  // Keyboard shortcut ESC to close modal
+  const handleSelectModal = useCallback((modal: ModalType) => setActiveModal(modal), []);
+
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setActiveModal(null);
-      }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActiveModal(null);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#EFE8DC] font-sans">
-      {/* 1. Header TopBar */}
+    <div className="relative h-screen w-screen overflow-hidden bg-[#efe8dc] font-sans">
       <TopBar
         roomState={roomState}
         onSetWeather={handleSetWeather}
+        onUseLiveWeather={handleUseLiveWeather}
         onToggleMute={handleToggleMute}
         onOpenMoodAI={() => setActiveModal('mood-ai')}
+        onOpenCityPicker={() => setShowCityPicker(true)}
+        timeLabel={timeLabel}
+        timePhase={timePhase}
+        city={selectedCity}
+        isRefreshingWeather={isRefreshingWeather}
         zenMode={zenMode}
-        onToggleZenMode={() => setZenMode(!zenMode)}
+        onToggleZenMode={() => setZenMode((value) => !value)}
       />
 
-      {/* 2. Main 3D Room Experience */}
-      <main className="w-full h-full">
+      <main className="h-full w-full">
         <Room3D
           weather={roomState.weather}
           windowOpen={roomState.windowOpen}
           lampOn={roomState.lampOn}
-          onSelectModal={setActiveModal}
+          computerOpen={activeModal === 'computer'}
+          onSelectModal={handleSelectModal}
           onToggleWindow={handleToggleWindow}
           onToggleLamp={handleToggleLamp}
         />
       </main>
 
-      {/* 3. Side Bento Cards (Hidden in Zen Mode) */}
       {!zenMode && (
-        <BentoCards
-          stickyNote={roomState.stickyNote}
-          onOpenModal={setActiveModal}
-          onOpenMoodAI={() => setActiveModal('mood-ai')}
-        />
+        <BentoCards stickyNote={roomState.stickyNote} onOpenModal={setActiveModal} onOpenMoodAI={() => setActiveModal('mood-ai')} />
       )}
 
-      {/* 4. Bottom Floating Dock (Hidden in Zen Mode) */}
-      {!zenMode && (
-        <FloatingDock
-          activeModal={activeModal}
-          onSelectModal={setActiveModal}
-        />
-      )}
+      {!zenMode && <FloatingDock activeModal={activeModal} onSelectModal={setActiveModal} />}
 
-      {/* 5. Modals */}
-      {activeModal === 'computer' && (
-        <ComputerModal onClose={() => setActiveModal(null)} />
-      )}
-      {activeModal === 'drawing' && (
-        <DrawingModal onClose={() => setActiveModal(null)} />
-      )}
-      {activeModal === 'game' && (
-        <GameModal onClose={() => setActiveModal(null)} />
-      )}
-      {activeModal === 'diy' && (
-        <DIYModal onClose={() => setActiveModal(null)} />
-      )}
-      {activeModal === 'atmosphere' && (
-        <AtmosphereModal
-          roomState={roomState}
-          onSetWeather={handleSetWeather}
-          onToggleWindow={handleToggleWindow}
-          onToggleLamp={handleToggleLamp}
-          onToggleMute={handleToggleMute}
-          onUpdateVolume={handleUpdateVolume}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
-      {activeModal === 'mood-ai' && (
-        <MoodAIModal
-          onApplyRecommendation={handleApplyMoodAI}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
-      {activeModal === 'about' && (
-        <AboutModal onClose={() => setActiveModal(null)} />
-      )}
+      {activeModal === 'computer' && <ComputerModal city={selectedCity} timeLabel={timeLabel} onClose={() => setActiveModal(null)} />}
+      {activeModal === 'drawing' && <DrawingModal onClose={() => setActiveModal(null)} />}
+      {activeModal === 'game' && <GameModal onClose={() => setActiveModal(null)} />}
+      {activeModal === 'diy' && <DIYModal onClose={() => setActiveModal(null)} />}
+      {activeModal === 'atmosphere' && <AtmosphereModal roomState={roomState} onSetWeather={handleSetWeather} onToggleWindow={handleToggleWindow} onToggleLamp={handleToggleLamp} onToggleMute={handleToggleMute} onUpdateVolume={handleUpdateVolume} onClose={() => setActiveModal(null)} />}
+      {activeModal === 'mood-ai' && <MoodAIModal onApplyRecommendation={handleApplyMoodAI} onClose={() => setActiveModal(null)} />}
+      {activeModal === 'about' && <AboutModal onClose={() => setActiveModal(null)} />}
+
+      {showCityPicker && <CityPicker onSelect={handleSelectCity} />}
     </div>
   );
 };
