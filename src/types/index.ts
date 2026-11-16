@@ -1,5 +1,24 @@
 export type WeatherPreset = 'sunny' | 'rain' | 'snow' | 'autumn' | 'night';
 
+export interface CityConfig {
+  id: string;
+  name: string;
+  country: string;
+  timezone: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface WeatherSnapshot {
+  preset: WeatherPreset;
+  temperature: number;
+  windSpeed: number;
+  weatherCode: number;
+  fetchedAt: number;
+  sunrise?: string;
+  sunset?: string;
+}
+
 export interface RoomState {
   weather: WeatherPreset;
   windowOpen: boolean;
@@ -9,6 +28,9 @@ export interface RoomState {
   volumeAmbient: number;
   stickyNote: string;
   roomRotation: number;
+  city?: CityConfig;
+  weatherMode?: 'live' | 'manual';
+  actualWeather?: WeatherSnapshot;
 }
 
 export type ModalType = 
