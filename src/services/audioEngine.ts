@@ -1,177 +1,122 @@
-import { WeatherPreset } from '../types';
+import type { AudioTrack, RoomState, TrackMix, WeatherPreset } from '../types';
+
+const mix: Record<WeatherPreset, TrackMix> = {
+  sunny: { rain: 0.06, wind: 0.4, birds: 1, lofi: 0.35 },
+  rain: { rain: 1, wind: 0.7, birds: 0.1, lofi: 0.5 },
+  snow: { rain: 0.06, wind: 0.65, birds: 0.1, lofi: 0.55 },
+  autumn: { rain: 0.06, wind: 0.9, birds: 0.45, lofi: 0.45 },
+  night: { rain: 0.06, wind: 0.25, birds: 0.07, lofi: 0.9 },
+};
 
 class ProceduralAudioEngine {
   private ctx: AudioContext | null = null;
-  private isMuted: boolean = true;
-  private masterGain: GainNode | null = null;
-  private weatherGain: GainNode | null = null;
-  private weatherFilter: BiquadFilterNode | null = null;
-  private ambientGain: GainNode | null = null;
-  
-  // Oscillators and noise nodes
-  private noiseNode: AudioBufferSourceNode | null = null;
-  private birdTimer: number | null = null;
-  private isInitialized: boolean = false;
+  private master: GainNode | null = null;
+  private channels = {} as Record<AudioTrack, GainNode>;
+  private filters: BiquadFilterNode[] = [];
+  private timer: number | null = null;
+  private state: Pick<RoomState, 'weather' | 'windowOpen' | 'audioTracks' | 'masterVolume'> | null = null;
+  private muted = true;
+  private beat = 0;
 
-  private currentPreset: WeatherPreset = 'sunny';
-  private windowOpen: boolean = true;
-
-  constructor() {
-    // AudioContext will only be created/resumed on user gesture
-  }
-
-  private initContext() {
+  private init() {
     if (this.ctx) return;
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    this.ctx = new AudioContextClass();
-
-    this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.setValueAtTime(0, this.ctx.currentTime);
-    this.masterGain.connect(this.ctx.destination);
-
-    // Weather channel
-    this.weatherGain = this.ctx.createGain();
-    this.weatherFilter = this.ctx.createBiquadFilter();
-    this.weatherFilter.type = 'lowpass';
-    this.weatherFilter.frequency.setValueAtTime(1200, this.ctx.currentTime);
-
-    this.weatherGain.connect(this.weatherFilter);
-    this.weatherFilter.connect(this.masterGain);
-
-    // Ambient channel
-    this.ambientGain = this.ctx.createGain();
-    this.ambientGain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-    this.ambientGain.connect(this.masterGain);
-
-    this.startNoiseGenerators();
-    this.isInitialized = true;
-  }
-
-  private startNoiseGenerators() {
-    if (!this.ctx || !this.weatherGain || !this.ambientGain) return;
-
-    // Create 5 seconds loop of pink/white noise
-    const bufferSize = this.ctx.sampleRate * 5;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1;
-      b0 = 0.99886 * b0 + white * 0.0555179;
-      b1 = 0.99332 * b1 + white * 0.0750759;
-      b2 = 0.96900 * b2 + white * 0.1538520;
-      b3 = 0.86650 * b3 + white * 0.3104856;
-      b4 = 0.55000 * b4 + white * 0.5329522;
-      b5 = -0.7616 * b5 - white * 0.0168980;
-      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.04;
-      b6 = white * 0.115926;
-    }
-
-    this.noiseNode = this.ctx.createBufferSource();
-    this.noiseNode.buffer = buffer;
-    this.noiseNode.loop = true;
-    this.noiseNode.connect(this.weatherGain);
-    this.noiseNode.start();
-  }
-
-  private triggerBirdChirp() {
-    if (!this.ctx || this.isMuted || !this.ambientGain || this.currentPreset !== 'sunny') return;
-    
-    try {
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const chirpGain = this.ctx.createGain();
-      
-      osc.type = 'sine';
-      const baseFreq = 2200 + Math.random() * 800;
-      osc.frequency.setValueAtTime(baseFreq, now);
-      osc.frequency.exponentialRampToValueAtTime(baseFreq + 600, now + 0.06);
-      osc.frequency.exponentialRampToValueAtTime(baseFreq - 300, now + 0.14);
-
-      chirpGain.gain.setValueAtTime(0, now);
-      chirpGain.gain.linearRampToValueAtTime(0.04 * (this.windowOpen ? 1 : 0.3), now + 0.02);
-      chirpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
-
-      osc.connect(chirpGain);
-      chirpGain.connect(this.ambientGain);
-
-      osc.start(now);
-      osc.stop(now + 0.18);
-    } catch {
-      // ignore
-    }
-  }
-
-  public setMute(muted: boolean) {
-    this.isMuted = muted;
-    if (!muted) {
-      this.initContext();
-      if (this.ctx && this.ctx.state === 'suspended') {
-        this.ctx.resume();
+    const Constructor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!Constructor) throw new Error('当前浏览器不支持环境音');
+    const ctx = this.ctx = new Constructor();
+    this.master = ctx.createGain();
+    this.master.gain.value = 0;
+    const compressor = ctx.createDynamicsCompressor();
+    this.master.connect(compressor).connect(ctx.destination);
+    (['rain', 'wind', 'birds', 'lofi'] as AudioTrack[]).forEach(track => {
+      const gain = this.channels[track] = ctx.createGain();
+      gain.gain.value = 0;
+      if (track === 'rain' || track === 'wind') {
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 1600;
+        gain.connect(filter).connect(this.master!);
+        this.filters.push(filter);
+      } else gain.connect(this.master!);
+    });
+    // Two looped sources are allocated once; switching weather only changes gains/filters.
+    for (const track of ['rain', 'wind'] as const) {
+      const noise = ctx.createBuffer(1, ctx.sampleRate * 6, ctx.sampleRate);
+      const data = noise.getChannelData(0);
+      let brown = 0;
+      for (let i = 0; i < data.length; i++) {
+        const white = Math.random() * 2 - 1;
+        brown = (brown + white * 0.02) / 1.02;
+        // Fade both ends to zero so the loop has no amplitude discontinuity.
+        const envelope = Math.min(1, i / 500, (data.length - i - 1) / 500);
+        data[i] = (track === 'rain' ? white * 0.14 : brown * 1.5) * envelope;
       }
+      const source = ctx.createBufferSource();
+      source.buffer = noise;
+      source.loop = true;
+      source.connect(this.channels[track]);
+      source.start();
     }
-
-    if (this.masterGain && this.ctx) {
-      const targetGain = muted ? 0 : 0.8;
-      this.masterGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.1);
-    }
-
-    if (!muted && this.currentPreset === 'sunny' && !this.birdTimer) {
-      this.birdTimer = window.setInterval(() => {
-        if (Math.random() > 0.4) {
-          this.triggerBirdChirp();
-        }
-      }, 4000);
-    } else if (muted && this.birdTimer) {
-      clearInterval(this.birdTimer);
-      this.birdTimer = null;
-    }
+    this.timer = window.setInterval(() => this.tick(), 650);
   }
 
-  public updatePreset(preset: WeatherPreset, windowOpen: boolean, volWeather: number, volAmbient: number) {
-    this.currentPreset = preset;
-    this.windowOpen = windowOpen;
-
-    if (!this.isInitialized || !this.ctx || !this.weatherGain || !this.weatherFilter || !this.ambientGain) {
-      return;
-    }
-
-    const now = this.ctx.currentTime;
-    // Window attenuation
-    const windowFactor = windowOpen ? 1.0 : 0.35;
-    const filterFreq = windowOpen ? 3000 : 700;
-
-    this.weatherFilter.frequency.setTargetAtTime(filterFreq, now, 0.4);
-
-    switch (preset) {
-      case 'sunny':
-        // Soft rustle
-        this.weatherGain.gain.setTargetAtTime(volWeather * 0.15 * windowFactor, now, 0.3);
-        this.ambientGain.gain.setTargetAtTime(volAmbient * 0.25, now, 0.3);
-        break;
-      case 'rain':
-        // Rich rain sound
-        this.weatherGain.gain.setTargetAtTime(volWeather * 0.7 * windowFactor, now, 0.3);
-        this.ambientGain.gain.setTargetAtTime(volAmbient * 0.2, now, 0.3);
-        break;
-      case 'snow':
-        // Quiet wind
-        this.weatherGain.gain.setTargetAtTime(volWeather * 0.25 * windowFactor, now, 0.3);
-        this.ambientGain.gain.setTargetAtTime(volAmbient * 0.15, now, 0.3);
-        break;
-      case 'autumn':
-        // Autumn breeze & leaves rustle
-        this.weatherGain.gain.setTargetAtTime(volWeather * 0.45 * windowFactor, now, 0.3);
-        this.ambientGain.gain.setTargetAtTime(volAmbient * 0.3, now, 0.3);
-        break;
-      case 'night':
-        // Warm lo-fi room stillness
-        this.weatherGain.gain.setTargetAtTime(volWeather * 0.1 * windowFactor, now, 0.3);
-        this.ambientGain.gain.setTargetAtTime(volAmbient * 0.12, now, 0.3);
-        break;
-    }
+  private tone(track: 'lofi' | 'birds', frequency: number, duration: number, level: number) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, now = ctx.currentTime;
+    const oscillator = ctx.createOscillator(), envelope = ctx.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(frequency, now);
+    if (track === 'birds') oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.35, now + 0.08);
+    envelope.gain.setValueAtTime(0, now);
+    envelope.gain.linearRampToValueAtTime(level, now + 0.04);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    oscillator.connect(envelope).connect(this.channels[track]);
+    oscillator.start(now);
+    oscillator.stop(now + duration + 0.01);
+    oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
   }
+
+  private tick() {
+    if (this.muted || this.ctx?.state !== 'running' || !this.state) return;
+    const melody = [196, 246.94, 293.66, 220, 174.61, 220, 261.63, 196];
+    this.tone('lofi', melody[this.beat % melody.length], 1.15, 0.1);
+    if (this.beat % 4 === 0) this.tone('lofi', melody[this.beat % melody.length] / 2, 1.6, 0.07);
+    if (this.beat % 5 === 0 && this.state.audioTracks.birds > 0) {
+      this.tone('birds', 2200 + Math.random() * 400, 0.2, 0.18);
+    }
+    this.beat++;
+  }
+
+  update(state: Pick<RoomState, 'weather' | 'windowOpen' | 'audioTracks' | 'masterVolume'>) {
+    this.state = state;
+    if (!this.ctx || !this.master) return;
+    const t = this.ctx.currentTime;
+    const weatherMix = mix[state.weather];
+    for (const track of Object.keys(this.channels) as AudioTrack[]) {
+      const attenuation = track === 'lofi' ? 1 : state.windowOpen ? 1 : track === 'birds' ? 0.4 : 0.28;
+      const target = state.audioTracks[track] * weatherMix[track] * attenuation;
+      const param = this.channels[track].gain;
+      param.cancelScheduledValues(t);
+      param.setTargetAtTime(target, t, 0.35);
+    }
+    for (const filter of this.filters) filter.frequency.setTargetAtTime(state.windowOpen ? 3600 : 650, t, 0.35);
+    this.master.gain.setTargetAtTime(this.muted ? 0 : state.masterVolume, t, 0.1);
+  }
+
+  async setMute(muted: boolean): Promise<boolean> {
+    if (muted) {
+      this.muted = true;
+      if (this.ctx && this.master) this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.04);
+      return true;
+    }
+    // Only called directly by a user's explicit sound button, never by a scene/AI effect.
+    this.init();
+    if (this.ctx!.state !== 'running') await this.ctx!.resume();
+    if (this.ctx!.state !== 'running') throw new Error('浏览器未允许播放，请再点击开启环境音');
+    this.muted = false;
+    if (this.state) this.update(this.state);
+    return false;
+  }
+
+  get playing() { return !this.muted && this.ctx?.state === 'running'; }
 }
-
 export const audioEngine = new ProceduralAudioEngine();

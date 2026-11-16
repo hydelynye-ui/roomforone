@@ -1,40 +1,13 @@
 import React from 'react';
 import { X, ExternalLink, Code2, Sparkles, FolderGit2 } from 'lucide-react';
-import { ProjectItem } from '../types';
+import { projects } from '../data/projects';
 
 interface ComputerModalProps {
   onClose: () => void;
 }
 
 export const ComputerModal: React.FC<ComputerModalProps> = ({ onClose }) => {
-  const projects: ProjectItem[] = [
-    {
-      id: 'roomforone',
-      title: 'roomforone',
-      subtitle: '沉浸式低多边形独处数字空间',
-      tag: 'Three.js / React 19 / Web Audio',
-      description: '一个人的房间。将 3D 物件探索、自适应当季天气、环境音模拟、画板创作与 AI 心情氛围转换融为一体。',
-      highlights: ['低多边形开放剖面房间', '环境音与天气程序化联动', '独立命名空间与本地离线存储'],
-      link: 'https://github.com/hydelynye-ui/roomforone',
-    },
-    {
-      id: 'focus-space',
-      title: 'Focus Space',
-      subtitle: '个人专注数字桌面与生产力系统',
-      tag: 'React 19 / TypeScript / IndexedDB',
-      description: '集专注计时、任务清单、日程规划与声景于一体的心流空间，支持多时钟视觉与平滑场景切换。',
-      highlights: ['多时钟视觉渲染引擎', '防漂移高精度计时', '纯前端本地双重持久化'],
-      demoUrl: 'https://focus-space-d5gmg1bimc422765f-1525079590.tcloudbaseapp.com/',
-    },
-    {
-      id: 'pricing-engine',
-      title: 'FOMS Hybrid Pricing Engine',
-      subtitle: '物流三方费率多维测算与比价模型',
-      tag: 'TypeScript / Excel Model / Algorithms',
-      description: '支持多承运商尾端分级计费、动态燃油附加费及全量敏感度分析的高性能算费引擎。',
-      highlights: ['阶梯重量区间计算', '极速并行算费', '高维度矩阵比价'],
-    },
-  ];
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-fade-in">
@@ -54,6 +27,7 @@ export const ComputerModal: React.FC<ComputerModalProps> = ({ onClose }) => {
           </div>
           <button
             onClick={onClose}
+            aria-label="关闭作品面板"
             className="p-1.5 rounded-full hover:bg-[#EFE8DC] text-[#34312E]/70 hover:text-[#34312E] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -103,14 +77,14 @@ export const ComputerModal: React.FC<ComputerModalProps> = ({ onClose }) => {
                   <span className="text-[11px] text-[#34312E]/50 flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-[#91A58C]" /> 活跃维护
                   </span>
-                  {proj.demoUrl && (
+                  {(proj.demoUrl || proj.link) && (
                     <a
-                      href={proj.demoUrl}
+                      href={proj.demoUrl || proj.link}
                       target="_blank"
                       rel="noreferrer"
                       className="text-[#C98464] hover:underline flex items-center gap-1 font-medium"
                     >
-                      访问演示 <ExternalLink className="w-3 h-3" />
+                      {proj.demoUrl ? '访问演示' : '查看项目'} <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
                 </div>

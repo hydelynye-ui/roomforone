@@ -1,300 +1,69 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { X, Play, RotateCcw, Trophy, Sparkles } from 'lucide-react';
-
-interface GameModalProps {
-  onClose: () => void;
-}
-
-interface Leaf {
-  x: number;
-  y: number;
-  speed: number;
-  type: 'gold' | 'maple' | 'sage';
-  size: number;
-  points: number;
-  angle: number;
-  rotSpeed: number;
-}
-
-export const GameModal: React.FC<GameModalProps> = ({ onClose }) => {
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Trophy, Play } from 'lucide-react';
+import { SwitchControls, SwitchButton } from './SwitchControls';
+interface Props { onClose: () => void; highScore: number; onHighScore: (value: number) => void }
+interface Leaf { x: number; y: number; speed: number; phase: number; color: string; points: number }
+export const GameModal: React.FC<Props> = ({ onClose, highScore, onHighScore }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [highScore, setHighScore] = useState(0);
-  const [gameOver, setGameOver] = useState(false);
-
-  const basketX = useRef(250);
-  const leaves = useRef<Leaf[]>([]);
-  const animFrame = useRef<number | null>(null);
-
-  // Load high score
+  const [playing, setPlaying] = useState(false), [paused, setPaused] = useState(false), [score, setScore] = useState(0), [time, setTime] = useState(30), [ended, setEnded] = useState(false);
+  const state = useRef({ playing: false, paused: false, score: 0, seconds: 30, basket: 250, leaves: [] as Leaf[], spawn: 0 });
+  const keys = useRef(new Set<SwitchButton>());
+  const latest = useRef({ highScore, onHighScore }); latest.current = { highScore, onHighScore };
+  const start = () => { state.current = { playing: true, paused: false, score: 0, seconds: 30, basket: 250, leaves: [], spawn: 0 }; setPlaying(true); setPaused(false); setScore(0); setTime(30); setEnded(false); keys.current.clear(); };
+  const back = () => { state.current.playing = false; state.current.paused = false; setPlaying(false); setPaused(false); setEnded(false); keys.current.clear(); };
+  const pause = () => { if (!state.current.playing) return; state.current.paused = !state.current.paused; setPaused(state.current.paused); };
+  const onPress = (b: SwitchButton) => {
+    keys.current.add(b);
+    if (b === 'A') { if (!state.current.playing) start(); else if (state.current.paused) pause(); }
+    if (b === 'B' || b === '−') back();
+    if (b === 'Home') onClose();
+    if (b === 'X' || b === '+') { if (!state.current.playing) start(); else pause(); }
+    if (b === 'Y') start();
+  };
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('roomforone_leaf_game_high');
-      if (saved) setHighScore(parseInt(saved, 10));
-    } catch {
-      // ignore
-    }
+    const canvas = canvasRef.current!, ctx = canvas.getContext('2d')!;
+    let frame = 0, last = 0;
+    const loop = (now: number) => {
+      const dt = Math.min(0.04, (now - last) / 1000 || 0); last = now;
+      const s = state.current;
+      if (s.playing && !s.paused && !document.hidden) {
+        const direction = (['RIGHT', 'R'].some(b => keys.current.has(b as SwitchButton)) ? 1 : 0) - (['LEFT', 'L'].some(b => keys.current.has(b as SwitchButton)) ? 1 : 0);
+        const modifier = keys.current.has('ZL') || keys.current.has('DOWN') ? 0.45 : keys.current.has('ZR') || keys.current.has('UP') ? 1.7 : 1;
+        s.basket = Math.max(37, Math.min(463, s.basket + direction * 300 * dt * modifier));
+        s.seconds -= dt; s.spawn += dt;
+        if (s.spawn > 0.43) { s.spawn = 0; const special = Math.random() > 0.7; s.leaves.push({ x: 30 + Math.random() * 440, y: -15, speed: 100 + Math.random() * 65, phase: Math.random() * 8, color: special ? '#C98464' : '#C99B53', points: special ? 20 : 10 }); }
+        for (const leaf of s.leaves) {
+          const oldY = leaf.y; leaf.y += leaf.speed * dt; leaf.x += Math.sin(leaf.y / 30 + leaf.phase) * 23 * dt;
+          if (oldY < 280 && leaf.y >= 280 && Math.abs(leaf.x - s.basket) < 45) { s.score += leaf.points; leaf.y = 400; setScore(s.score); }
+        }
+        s.leaves = s.leaves.filter(l => l.y < 340);
+        setTime(Math.max(0, Math.ceil(s.seconds)));
+        if (s.seconds <= 0) { s.playing = false; setPlaying(false); setEnded(true); if (s.score > latest.current.highScore) latest.current.onHighScore(s.score); }
+      }
+      ctx.fillStyle = '#F1EADD'; ctx.fillRect(0, 0, 500, 320);
+      ctx.fillStyle = '#DEDAC4'; ctx.beginPath(); ctx.ellipse(130, -30, 220, 110, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#DAC8A6'; ctx.beginPath(); ctx.ellipse(440, -20, 180, 95, 0, 0, Math.PI * 2); ctx.fill();
+      for (const l of s.leaves) { ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(l.y / 90); ctx.fillStyle = l.color; ctx.beginPath(); ctx.moveTo(0, -13); ctx.bezierCurveTo(18, -7, 16, 6, 0, 14); ctx.bezierCurveTo(-16, 6, -18, -7, 0, -13); ctx.fill(); ctx.restore(); }
+      ctx.fillStyle = '#C9A47E'; ctx.strokeStyle = '#89674C'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(s.basket - 35, 285, 70, 24, [3, 3, 12, 12]); ctx.fill(); ctx.stroke();
+      for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.moveTo(s.basket - 27 + i * 10, 286); ctx.lineTo(s.basket - 27 + i * 10, 306); ctx.stroke(); }
+      frame = requestAnimationFrame(loop);
+    };
+    frame = requestAnimationFrame(loop);
+    const hide = () => { if (document.hidden && state.current.playing) { state.current.paused = true; setPaused(true); keys.current.clear(); } };
+    document.addEventListener('visibilitychange', hide);
+    return () => { cancelAnimationFrame(frame); document.removeEventListener('visibilitychange', hide); };
   }, []);
-
-  const startGame = () => {
-    setScore(0);
-    setTimeLeft(30);
-    setGameOver(false);
-    setIsPlaying(true);
-    leaves.current = [];
-    basketX.current = 250;
-  };
-
-  // Timer countdown
-  useEffect(() => {
-    if (!isPlaying || gameOver) return;
-    const interval = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) {
-          clearInterval(interval);
-          setGameOver(true);
-          setIsPlaying(false);
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isPlaying, gameOver]);
-
-  // Update high score
-  useEffect(() => {
-    if (gameOver && score > highScore) {
-      setHighScore(score);
-      try {
-        localStorage.setItem('roomforone_leaf_game_high', score.toString());
-      } catch {
-        // ignore
-      }
-    }
-  }, [gameOver, score, highScore]);
-
-  // Keyboard controls
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isPlaying) return;
-      if (e.key === 'ArrowLeft' || e.key === 'a') {
-        basketX.current = Math.max(40, basketX.current - 25);
-      } else if (e.key === 'ArrowRight' || e.key === 'd') {
-        basketX.current = Math.min(460, basketX.current + 25);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPlaying]);
-
-  // Mouse / Touch movement
-  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isPlaying) return;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const clientX = e.clientX;
-    const scale = 500 / rect.width;
-    const x = (clientX - rect.left) * scale;
-    basketX.current = Math.max(40, Math.min(460, x));
-  };
-
-  // Main Game Loop
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let lastSpawn = 0;
-
-    const loop = (timestamp: number) => {
-      // Clear
-      ctx.fillStyle = '#FAF7F0';
-      ctx.fillRect(0, 0, 500, 360);
-
-      // Spawn leaf
-      if (timestamp - lastSpawn > 450) {
-        lastSpawn = timestamp;
-        const types: ('gold' | 'maple' | 'sage')[] = ['gold', 'maple', 'sage'];
-        const chosen = types[Math.floor(Math.random() * types.length)];
-        leaves.current.push({
-          x: Math.random() * 440 + 30,
-          y: -10,
-          speed: Math.random() * 2 + 2,
-          type: chosen,
-          size: chosen === 'maple' ? 18 : 14,
-          points: chosen === 'maple' ? 20 : chosen === 'gold' ? 10 : 5,
-          angle: Math.random() * Math.PI * 2,
-          rotSpeed: (Math.random() - 0.5) * 0.08,
-        });
-      }
-
-      // Draw and update leaves
-      for (let i = leaves.current.length - 1; i >= 0; i--) {
-        const leaf = leaves.current[i];
-        leaf.y += leaf.speed;
-        leaf.x += Math.sin(leaf.y * 0.05) * 1.5;
-        leaf.angle += leaf.rotSpeed;
-
-        ctx.save();
-        ctx.translate(leaf.x, leaf.y);
-        ctx.rotate(leaf.angle);
-
-        ctx.fillStyle = 
-          leaf.type === 'maple' ? '#C98464' :
-          leaf.type === 'gold' ? '#D97706' : '#91A58C';
-
-        // Draw leaf diamond shape
-        ctx.beginPath();
-        ctx.moveTo(0, -leaf.size);
-        ctx.bezierCurveTo(leaf.size * 0.8, -leaf.size * 0.3, leaf.size * 0.8, leaf.size * 0.3, 0, leaf.size);
-        ctx.bezierCurveTo(-leaf.size * 0.8, leaf.size * 0.3, -leaf.size * 0.8, -leaf.size * 0.3, 0, -leaf.size);
-        ctx.fill();
-        ctx.restore();
-
-        // Check catch collision with basket (basket Y is at 310, width 60)
-        const bx = basketX.current;
-        if (leaf.y >= 300 && leaf.y <= 325 && Math.abs(leaf.x - bx) < 38) {
-          setScore((s) => s + leaf.points);
-          leaves.current.splice(i, 1);
-          continue;
-        }
-
-        // Remove if off bottom
-        if (leaf.y > 370) {
-          leaves.current.splice(i, 1);
-        }
-      }
-
-      // Draw Basket
-      const bx = basketX.current;
-      ctx.fillStyle = '#C9A47E';
-      ctx.beginPath();
-      ctx.roundRect(bx - 35, 310, 70, 26, [4, 4, 12, 12]);
-      ctx.fill();
-
-      // Basket woven lines
-      ctx.strokeStyle = '#825E3B';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      animFrame.current = requestAnimationFrame(loop);
-    };
-
-    animFrame.current = requestAnimationFrame(loop);
-
-    return () => {
-      if (animFrame.current) cancelAnimationFrame(animFrame.current);
-    };
-  }, [isPlaying]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-fade-in">
-      <div 
-        className="w-full max-w-xl bg-[#FAF7F0] border border-[#C9A47E]/40 rounded-3xl shadow-2xl flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#C9A47E]/20">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#C98464]" />
-            <h3 className="text-sm font-bold text-[#34312E]">
-              桌角手柄 · 秋日接落叶 (轻量小游戏)
-            </h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-[#EFE8DC] text-[#34312E]/70 hover:text-[#34312E] transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+    <div className="w-full max-w-xl bg-[#FAF7F0] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+      <header className="modal-header"><span className="w-2.5 h-2.5 bg-[#C98464] rounded-full" /><h2>Switch · 秋日接落叶</h2><button onClick={onClose} aria-label="关闭游戏"><X size={18} /></button></header>
+      <div className="game-content">
+        <div className="flex justify-between text-xs p-3"><span>得分 <b className="text-[#C98464]">{score}</b> · 剩余 {time}s</span><span className="flex items-center gap-1"><Trophy size={14} />最高 {highScore}</span></div>
+        <div className="relative game-canvas-wrap"><canvas ref={canvasRef} width="500" height="320" aria-label="落叶小游戏画面" onPointerMove={e => { if (!state.current.playing) return; const r = e.currentTarget.getBoundingClientRect(); state.current.basket = Math.max(37, Math.min(463, (e.clientX - r.left) / r.width * 500)); }} className="w-full block touch-none" />
+          {(!playing || paused) && <div className="game-overlay"><h3>{paused ? '留一小会儿空白' : ended ? '接住了 ' + score + ' 分的秋天' : '接住一点秋天'}</h3><p>{ended ? '30 秒结束，随时可以再玩一局。' : '移动竹篮收集落叶，30 秒就好。'}</p><button className="soft-button" onClick={paused ? pause : start}><Play size={14} />{paused ? '继续 / A' : '开始 / A'}</button></div>}
         </div>
-
-        {/* Game Stats Bar */}
-        <div className="px-6 py-2.5 bg-[#EFE8DC]/50 border-b border-[#C9A47E]/20 flex items-center justify-between text-xs font-medium">
-          <div className="flex items-center gap-4">
-            <span className="text-[#34312E]">
-              得分: <strong className="text-base text-[#C98464]">{score}</strong>
-            </span>
-            <span className="text-[#34312E]/70">
-              倒计时: <strong className="text-[#34312E]">{timeLeft}s</strong>
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 text-[#34312E]/60">
-            <Trophy className="w-3.5 h-3.5 text-amber-500" />
-            <span>最高纪录: {highScore}</span>
-          </div>
-        </div>
-
-        {/* Game Canvas Container */}
-        <div className="relative p-4 bg-[#EFE8DC]/30 flex items-center justify-center">
-          <canvas
-            ref={canvasRef}
-            width={500}
-            height={360}
-            onPointerMove={handlePointerMove}
-            className="w-full max-w-[480px] h-[320px] rounded-2xl border border-[#C9A47E]/30 bg-[#FAF7F0] shadow-inner cursor-ew-resize touch-none"
-          />
-
-          {/* Overlay Start / Game Over Screen */}
-          {!isPlaying && (
-            <div className="absolute inset-0 m-4 rounded-2xl bg-[#FAF7F0]/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
-              {gameOver ? (
-                <>
-                  <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-3">
-                    <Trophy className="w-6 h-6 text-amber-600" />
-                  </div>
-                  <h4 className="text-base font-bold text-[#34312E]">时间到！</h4>
-                  <p className="text-xs text-[#34312E]/70 mt-1">
-                    你在 30 秒内接住了落叶，最终得分：
-                    <span className="text-lg font-bold text-[#C98464] ml-1">{score}</span>
-                  </p>
-                  <button
-                    onClick={startGame}
-                    className="mt-4 flex items-center gap-2 px-5 py-2 rounded-full bg-[#C98464] hover:bg-[#B36F51] text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    再玩一局
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="w-12 h-12 rounded-full bg-[#EFE8DC] flex items-center justify-center mb-3 text-[#C98464]">
-                    <Sparkles className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-base font-bold text-[#34312E]">秋日接落叶</h4>
-                  <p className="text-xs text-[#34312E]/70 mt-1 max-w-xs leading-relaxed">
-                    左右移动小竹篮，在 30 秒内收集从树上飘落的落叶，放松片刻。
-                  </p>
-                  <button
-                    onClick={startGame}
-                    className="mt-4 flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#C9A47E] hover:bg-[#B58756] text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
-                  >
-                    <Play className="w-4 h-4 fill-current" />
-                    开始游戏
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Footer info */}
-        <div className="px-6 py-2.5 bg-[#FAF7F0] border-t border-[#C9A47E]/15 text-[11px] text-[#34312E]/60 flex items-center justify-between">
-          <span>可用键盘左右方向键 (A/D) 或触摸滑动控制竹篮</span>
-          <button
-            onClick={onClose}
-            className="text-[#C98464] hover:underline cursor-pointer font-medium"
-          >
-            返回房间
-          </button>
-        </div>
+        <SwitchControls playing={playing} paused={paused} onPress={onPress} onRelease={b => keys.current.delete(b)} />
+        <p className="game-help">A/Enter 开始 · B 返回 · X/+ 暂停 · Y 重开 · 方向键/L/R 移动 · ZL 慢速/ZR 快速 · Home/H 退出</p>
       </div>
     </div>
-  );
+  </div>;
 };

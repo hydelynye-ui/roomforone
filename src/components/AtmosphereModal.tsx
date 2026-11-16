@@ -57,6 +57,7 @@ export const AtmosphereModal: React.FC<AtmosphereModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="关闭氛围面板"
             className="p-1.5 rounded-full hover:bg-[#EFE8DC] text-[#34312E]/70 hover:text-[#34312E] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />

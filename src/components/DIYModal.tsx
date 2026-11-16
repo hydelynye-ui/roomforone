@@ -71,6 +71,7 @@ export const DIYModal: React.FC<DIYModalProps> = ({ onClose }) => {
           </div>
           <button
             onClick={onClose}
+            aria-label="关闭手作记录"
             className="p-1.5 rounded-full hover:bg-[#EFE8DC] text-[#34312E]/70 hover:text-[#34312E] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -86,7 +87,7 @@ export const DIYModal: React.FC<DIYModalProps> = ({ onClose }) => {
             <div>
               <h4 className="text-xs font-bold text-[#34312E]">动手制作，也是沉浸专注的方式</h4>
               <p className="text-[11px] text-[#34312E]/70 mt-0.5">
-                记录房间主人 YY 在木工、电子外设与纸本装订上的慢节奏实践。
+                这里先放三篇手作示例。真实作品照片、材料和过程待 YY 补充。
               </p>
             </div>
           </div>
@@ -99,7 +100,7 @@ export const DIYModal: React.FC<DIYModalProps> = ({ onClose }) => {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[#EFE8DC] text-[#34312E]">
-                    {item.category}
+                    示例 · {item.category}
                   </span>
                   <span className="text-[11px] text-[#34312E]/50">{item.date}</span>
                 </div>

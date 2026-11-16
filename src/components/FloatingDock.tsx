@@ -5,6 +5,8 @@ import {
   Palette, 
   Gamepad2, 
   Hammer, 
+  Lightbulb,
+  Headphones,
   SlidersHorizontal, 
   Info 
 } from 'lucide-react';
@@ -23,8 +25,6 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
     { id: null, label: '房间', icon: <Home className="w-4 h-4" /> },
     { id: 'computer', label: '作品', icon: <Monitor className="w-4 h-4" /> },
     { id: 'drawing', label: '画板', icon: <Palette className="w-4 h-4" /> },
-    { id: 'game', label: '游戏', icon: <Gamepad2 className="w-4 h-4" /> },
-    { id: 'diy', label: '手作', icon: <Hammer className="w-4 h-4" /> },
     { id: 'atmosphere', label: '氛围', icon: <SlidersHorizontal className="w-4 h-4" /> },
     { id: 'about', label: '关于', icon: <Info className="w-4 h-4" /> },
   ];
@@ -44,6 +44,7 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
                   : 'text-[#34312E]/70 hover:bg-[#EFE8DC] hover:text-[#34312E]'
               }`}
               title={item.label}
+              aria-label={item.label}
             >
               {item.icon}
               <span className="hidden sm:inline">{item.label}</span>

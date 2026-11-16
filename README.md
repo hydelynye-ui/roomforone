@@ -10,6 +10,8 @@
 - **物件直观导航入口**：
   - 💻 **电脑**：个人作品集与项目 Bento 展示面板。
   - 🎨 **画板**：Canvas 2D 自由涂鸦创作，支持画笔、橡皮、色盘、撤销与 PNG 导出，草稿自动暂存至本地 IndexedDB。
+  - 🧩 **Tangle**：桌面思考物件，点击后打开随手灵感便签，记录仅保存在当前设备。
+  - 🎧 **AirPods Max**：私人听觉入口，复用同一个环境音引擎，可调整天气声与房间声比例。
   - 🎮 **游戏手柄**：秋日接落叶 30 秒轻量趣味小游戏，支持键盘/触摸操控竹篮与最高分持久化。
   - 🔨 **侧墙洞洞板**：木工、客制化键盘与精装手账的手作图文记录。
   - 🪟 **窗户**：开/关窗状态切换，实时联动外部雨雪风声滤波器与粒子进入边界。
@@ -69,6 +71,8 @@ roomforone/
         ├── DrawingModal.tsx   # 涂鸦画板弹窗
         ├── GameModal.tsx      # 接落叶游戏弹窗
         ├── DIYModal.tsx       # 手作记录弹窗
+        ├── TangleModal.tsx    # Tangle 随手灵感便签
+        ├── HeadphonesModal.tsx# AirPods Max 声音入口
         ├── AtmosphereModal.tsx# 氛围与混音弹窗
         ├── MoodAIModal.tsx    # AI 心情转换弹窗
         └── AboutModal.tsx     # 关于与环境信息弹窗
@@ -167,3 +171,25 @@ tcb deploy
 1. **云函数真实大模型 API 接入**：通过独立云函数（`roomforone-ai`）接入服务端 LLM 模型，替代当前本地规则分析引擎。
 2. **多端云数据库同步**：通过带有 `roomforone_` 前缀的独立数据库表实现涂鸦草稿与便签的跨设备同步。
 3. **云存储私有画廊**：开通专属对象存储 `roomforone/uploads/` 供访客导出并分享个人涂鸦。
+
+
+## 互动房间更新（2026-11-16）
+
+本次完整实现和验收说明见 [IMPLEMENTATION_REPORT.md](IMPLEMENTATION_REPORT.md)。
+桌面小物件共用同一套选中、拿起、拖动、旋转与放回逻辑。所有新场景数据均写入原 `roomforone-state-v1`；既有 IndexedDB 画稿保留。
+
+```bash
+npm ci --include=optional
+npm run typecheck
+npm test
+npm run build
+npm run dev -- --host 0.0.0.0
+```
+
+鼠标拖动空白转动镜头；拖动物件移动，右键或 Shift + 拖动旋转。手机单指操作物件、双指转动房间，工具栏可切换旋转模式。选中后可使用方向键移动、R 旋转、Escape 退出。Tangle 拖动连接段改变形状，“恢复原状”重置形状。
+
+耳机面板提供雨声、风声、鸟鸣、lo-fi 四条独立逻辑轨、总音量与总静音；声音仅在主动点击后解锁。lo-fi 是自有程序生成的占位旋律。手柄的 A/B/方向键/Home 与既有秋日接落叶游戏联动，其余按钮的说明显示在游戏底部。
+
+WebGL 不可用时尝试 Three.js SVGRenderer 简化渲染，复用同一份场景、相机、射线拾取和状态；阴影、贴图及 GPU 玻璃效果会简化。若两种渲染都失败仍可浏览普通卡片。电脑与手机尺寸验收使用 `tests/viewport.html`，该测试页不进入 Vite 的生产入口。
+
+`.openai/hosting.json` 仅配置本次私密体验站。CloudBase 的专用环境与 `/` 根部署配置保持原样；未在当前会话执行 CloudBase 正式上传。
