@@ -1,23 +1,30 @@
 import React from 'react';
-import { 
-  Sun, 
-  CloudRain, 
-  Snowflake, 
-  Wind, 
-  Moon, 
-  Volume2, 
-  VolumeX, 
-  Sparkles,
+import {
+  Cloud,
+  CloudRain,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Moon,
+  Snowflake,
+  Sparkles,
+  Sun,
+  Volume2,
+  VolumeX,
+  Wind,
 } from 'lucide-react';
-import { WeatherPreset, RoomState } from '../types';
+import type { CityConfig, RoomState, WeatherPreset } from '../types';
 
 interface TopBarProps {
   roomState: RoomState;
   onSetWeather: (preset: WeatherPreset) => void;
+  onUseLiveWeather: () => void;
   onToggleMute: () => void;
   onOpenMoodAI: () => void;
+  onOpenCityPicker: () => void;
+  timeLabel: string;
+  timePhase: string;
+  city: CityConfig;
+  isRefreshingWeather: boolean;
   zenMode: boolean;
   onToggleZenMode: () => void;
 }
@@ -25,101 +32,75 @@ interface TopBarProps {
 export const TopBar: React.FC<TopBarProps> = ({
   roomState,
   onSetWeather,
+  onUseLiveWeather,
   onToggleMute,
   onOpenMoodAI,
+  onOpenCityPicker,
+  timeLabel,
+  timePhase,
+  city,
+  isRefreshingWeather,
   zenMode,
   onToggleZenMode,
 }) => {
   const presets: { id: WeatherPreset; label: string; icon: React.ReactNode }[] = [
-    { id: 'sunny', label: '晴日下午', icon: <Sun className="w-3.5 h-3.5 text-amber-500" /> },
-    { id: 'rain', label: '安静雨天', icon: <CloudRain className="w-3.5 h-3.5 text-blue-400" /> },
-    { id: 'snow', label: '冬日落雪', icon: <Snowflake className="w-3.5 h-3.5 text-sky-300" /> },
-    { id: 'autumn', label: '清爽秋日', icon: <Wind className="w-3.5 h-3.5 text-orange-400" /> },
-    { id: 'night', label: '暖灯夜晚', icon: <Moon className="w-3.5 h-3.5 text-indigo-400" /> },
+    { id: 'sunny', label: 'Clear', icon: <Sun size={14} /> },
+    { id: 'cloudy', label: 'Cloudy', icon: <Cloud size={14} /> },
+    { id: 'rain', label: 'Rain', icon: <CloudRain size={14} /> },
+    { id: 'snow', label: 'Snow', icon: <Snowflake size={14} /> },
+    { id: 'autumn', label: 'Wind', icon: <Wind size={14} /> },
   ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-30 h-14 px-4 md:px-6 flex items-center justify-between pointer-events-none select-none">
-      {/* Brand title */}
-      <div className="flex items-center gap-3 pointer-events-auto">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-[#FAF7F0] border border-[#C9A47E]/30 flex items-center justify-center shadow-sm">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#C98464]" />
-          </div>
-          <div>
-            <h1 className="text-sm md:text-base font-bold tracking-tight text-[#34312E] leading-none">
-              roomforone
-            </h1>
-            <p className="text-[10px] md:text-xs text-[#34312E]/60 mt-0.5 font-serif-sc">
-              给自己留一点空间
-            </p>
-          </div>
+    <header className="room-topbar">
+      <div className="room-brand-cluster">
+        <div className="room-brand">
+          <span className="room-brand-symbol" />
+          <span className="room-brand-name">roomforone</span>
         </div>
-      </div>
-
-      {/* Center Weather Quick Toggles */}
-      <div className="hidden lg:flex items-center gap-1.5 p-1 rounded-full bg-[#FAF7F0]/85 backdrop-blur-md border border-[#C9A47E]/30 shadow-sm pointer-events-auto">
-        {presets.map((p) => {
-          const isActive = roomState.weather === p.id;
-          return (
-            <button
-              key={p.id}
-              onClick={() => onSetWeather(p.id)}
-              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs transition-all duration-200 cursor-pointer ${
-                isActive
-                  ? 'bg-[#C9A47E] text-white shadow-xs font-medium'
-                  : 'text-[#34312E]/70 hover:bg-[#EFE8DC]/60 hover:text-[#34312E]'
-              }`}
-            >
-              {p.icon}
-              <span>{p.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Right Actions */}
-      <div className="flex items-center gap-2 pointer-events-auto">
-        {/* Mood AI Button */}
-        <button
-          onClick={onOpenMoodAI}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FAF7F0]/90 backdrop-blur-md border border-[#C9A47E]/30 text-xs font-medium text-[#34312E] shadow-sm hover:border-[#C98464] hover:bg-[#FAF7F0] transition-all cursor-pointer"
-          title="今天想待在什么样的房间？"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-[#C98464] animate-pulse" />
-          <span className="hidden sm:inline">心情氛围</span>
+        <button className="room-time-button" onClick={onOpenCityPicker} title="Change city">
+          <span className="room-time-city">{roomState.city ? city.name : 'Demo Environment'} · {timePhase}</span>
+          <span className="room-time-value">{timeLabel}</span>
         </button>
+      </div>
 
-        {/* Master Sound Button */}
+      <div className="room-weather-controls" aria-label="Weather preview">
         <button
+          className={roomState.weatherMode !== 'manual' ? 'is-active' : ''}
+          onClick={onUseLiveWeather}
+          title="Use live weather for your selected city"
+        >
+          <span className={`live-indicator ${isRefreshingWeather ? 'is-refreshing' : ''}`} />
+          Live
+        </button>
+        {presets.map((preset) => (
+          <button
+            key={preset.id}
+            className={roomState.weatherMode === 'manual' && roomState.weather === preset.id ? 'is-active' : ''}
+            onClick={() => onSetWeather(preset.id)}
+            title={`Preview ${preset.label.toLowerCase()} weather`}
+          >
+            {preset.icon}
+            <span>{preset.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="room-topbar-actions">
+        <button className="room-quiet-action" onClick={onOpenMoodAI} title="Set the room atmosphere">
+          <Sparkles size={15} />
+          <span>Atmosphere</span>
+        </button>
+        <button
+          className={`room-quiet-action room-sound-action ${roomState.masterMute ? '' : 'is-playing'}`}
           onClick={onToggleMute}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium backdrop-blur-md transition-all shadow-sm cursor-pointer ${
-            roomState.masterMute
-              ? 'bg-[#FAF7F0]/80 border-[#C9A47E]/30 text-[#34312E]/60 hover:text-[#34312E]'
-              : 'bg-[#91A58C] border-[#91A58C] text-white shadow-xs'
-          }`}
-          title={roomState.masterMute ? '开启环境音' : '静音'}
+          title={roomState.masterMute ? 'Enable room sound' : 'Mute room sound'}
         >
-          {roomState.masterMute ? (
-            <>
-              <VolumeX className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">静音中</span>
-            </>
-          ) : (
-            <>
-              <Volume2 className="w-3.5 h-3.5 animate-pulse" />
-              <span className="hidden sm:inline">声音开启</span>
-            </>
-          )}
+          {roomState.masterMute ? <VolumeX size={15} /> : <Volume2 size={15} />}
+          <span>{roomState.masterMute ? 'Sound off' : 'Sound on'}</span>
         </button>
-
-        {/* Zen Mode Toggle */}
-        <button
-          onClick={onToggleZenMode}
-          className="p-2 rounded-full bg-[#FAF7F0]/80 backdrop-blur-md border border-[#C9A47E]/30 text-[#34312E]/70 hover:text-[#34312E] shadow-sm transition-all cursor-pointer"
-          title={zenMode ? '退出沉浸模式' : '沉浸全屏视角'}
-        >
-          {zenMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+        <button className="room-icon-action" onClick={onToggleZenMode} title={zenMode ? 'Exit immersive view' : 'Enter immersive view'}>
+          {zenMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
         </button>
       </div>
     </header>
