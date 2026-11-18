@@ -29,6 +29,7 @@ export type AudioTrack = 'rain' | 'wind' | 'birds' | 'lofi';
 export type TrackMix = Record<AudioTrack, number>;
 export interface TangleNote { id: string; text: string; createdAt: number }
 export interface MovieEntry { id: string; title: string; year?: number; note: string; createdAt: number }
+export interface CanvasNote { id: string; text: string; x: number; y: number; tone: 'sage' | 'clay' | 'cream' }
 
 export interface RoomState {
   weather: WeatherPreset;
@@ -46,6 +47,7 @@ export interface RoomState {
   tangleNotes: TangleNote[];
   notesText: string;
   movieEntries: MovieEntry[];
+  canvasNotes: CanvasNote[];
   gameHighScore: number;
   city?: CityConfig;
   weatherMode?: 'live' | 'manual';
