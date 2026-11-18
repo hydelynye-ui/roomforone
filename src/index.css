@@ -491,3 +491,6 @@ body { overflow: hidden; font-family: 'Plus Jakarta Sans', Inter, ui-sans-serif,
 @media (max-width: 767px) { .computer-track { grid-template-columns: 7px minmax(62px,1fr) 24px minmax(65px,1.2fr) auto; } }
 
 .live-indicator.is-manual { background: #c9a47e; box-shadow: 0 0 0 3px rgba(201,164,126,.15); }
+
+.zen-mode .workspace { display: block; grid-template-columns: none; padding: 0; }
+.zen-mode .room-stage { border-radius: 0; }
