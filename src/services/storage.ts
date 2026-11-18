@@ -24,6 +24,7 @@ export const DEFAULT_ROOM_STATE: RoomState = {
   tangleNotes: [],
   notesText: '',
   movieEntries: [],
+  canvasNotes: [],
   gameHighScore: 0,
   weatherMode: 'live',
 };
@@ -72,6 +73,11 @@ export function normalizeRoomState(input: unknown): RoomState {
       && typeof entry.note === 'string' && Number.isFinite(entry.createdAt)
       && (entry.year === undefined || (Number.isInteger(entry.year) && entry.year >= 1888 && entry.year <= 2200)))
       .slice(0, 200).map(entry => ({ ...entry, title: entry.title.slice(0, 120), note: entry.note.slice(0, 1200) })) : [],
+    canvasNotes: Array.isArray(p.canvasNotes) ? p.canvasNotes.filter((note) =>
+      !!note && typeof note.id === 'string' && typeof note.text === 'string'
+      && Number.isFinite(note.x) && Number.isFinite(note.y)
+      && ['sage', 'clay', 'cream'].includes(note.tone))
+      .slice(0, 100).map(note => ({ ...note, text: note.text.slice(0, 2000), x: clamp(note.x, -4000, 4000), y: clamp(note.y, -4000, 4000) })) : [],
     gameHighScore: finite(p.gameHighScore, 0, 0, 1e7),
     city: p.city && typeof p.city.id === 'string' && typeof p.city.name === 'string'
       && typeof p.city.country === 'string' && typeof p.city.timezone === 'string'
