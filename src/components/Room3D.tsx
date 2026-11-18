@@ -16,8 +16,8 @@ interface Props {
   onTangle: (nodes: Vec3[]) => void;
   onRotation: (value: number) => void;
 }
-const names: Record<ObjectId, string> = { computer: '电脑', keyboard: '键盘', mouse: '鼠标', tangle: 'Tangle', headphones: 'AirPods Max', game: 'Switch 手柄', lamp: '台灯', atmosphere: '收音机', tools: 'DIY 工具' };
-const phases: Record<InteractionPhase, string> = { idle: '待机', hover: '悬停', selected: '已选中', picked: '已拿起', manipulating: '操作中', released: '已放回' };
+const names: Record<ObjectId, string> = { computer: 'Computer', keyboard: 'Keyboard', mouse: 'Mouse', tangle: 'Tangle', headphones: 'AirPods Max', game: 'Switch Controller', lamp: 'Desk Lamp', atmosphere: 'Audio', tools: 'Desk Tools' };
+const phases: Record<InteractionPhase, string> = { idle: 'Idle', hover: 'Hover', selected: 'Selected', picked: 'Picked up', manipulating: 'Moving', released: 'Released' };
 interface Handle { select: (id: ObjectId) => void; rotate: (delta: number) => void; move: (x: number, z: number) => void; reset: () => void; resetView: () => void }
 
 export const Room3D: React.FC<Props> = props => {
@@ -53,7 +53,7 @@ export const Room3D: React.FC<Props> = props => {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     host.appendChild(renderer.domElement);
     renderer.domElement.style.touchAction = 'none';
-    renderer.domElement.setAttribute('aria-label', '可旋转和拖动物件的 roomforone 房间');
+    renderer.domElement.setAttribute('aria-label', 'Explore and interact with the roomforone 3D space');
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-6, 6, 5, -5, 0.1, 100);
     let yaw = props.state.roomRotation, selected: ObjectId | null = null;
@@ -70,7 +70,7 @@ export const Room3D: React.FC<Props> = props => {
     const material = (color: number, options: THREE.MeshStandardMaterialParameters = {}) => {
       const m = new THREE.MeshStandardMaterial({ color, roughness: 0.84, ...options }); materials.add(m); return m;
     };
-    const wall = material(0xEFE8DC), wood = material(0xC9A47E), darkWood = material(0x89674C);
+    const wood = material(0xC9A47E), darkWood = material(0x89674C);
     const sage = material(0x91A58C), terracotta = material(0xC98464), graphite = material(0x34312E);
     const paper = material(0xFAF7F0), silver = material(0xACB5B0, { roughness: 0.55, metalness: 0.3 });
     const peach = material(0xF5B4BC, { transparent: true, opacity: 0.78, roughness: 0.4 });
@@ -92,17 +92,9 @@ export const Room3D: React.FC<Props> = props => {
     sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = -6; sun.shadow.camera.right = 6; sun.shadow.camera.top = 6; sun.shadow.camera.bottom = -6; sun.shadow.bias = -0.001; scene.add(sun);
     const lampLight = new THREE.PointLight(0xFFBE70, 0, 4, 1.8); scene.add(lampLight);
 
-    // Retained open-cut room, with an actual window aperture instead of a solid wall behind glass.
+    // Open architectural set: no walls or ceiling. The right-side window is a freestanding frame.
     box([6.4, 0.24, 6.4], wood, scene, [0, -0.12, 0]).renderOrder = software ? -10 : 0;
     for (let i = 0; i < 10; i++) box([6.35, 0.004, 0.012], darkWood, scene, [0, 0.004, -2.85 + i * 0.63]).renderOrder = software ? -9 : 0;
-    const leftWall = box([0.15, 4.2, 6.4], wall, scene, [-3.2, 2.0, 0]);
-    const back = new THREE.Group(); scene.add(back);
-    box([6.4, 1.65, 0.15], wall, back, [0, 0.705, -3.2]);
-    box([6.4, 0.75, 0.15], wall, back, [0, 3.725, -3.2]);
-    box([2.55, 1.82, 0.15], wall, back, [-1.925, 2.44, -3.2]);
-    box([1.45, 1.82, 0.15], wall, back, [2.475, 2.44, -3.2]);
-    box([6.3, 0.14, 0.08], darkWood, scene, [0, 0.07, -3.09]);
-    box([0.08, 0.14, 6.3], darkWood, scene, [-3.09, 0.07, 0]);
     if (software) {
       const rug = mesh(new THREE.PlaneGeometry(3.3, 2.65), material(0xDEDCCB), scene, [0.2, 0.03, 0.9]); rug.rotation.x = -Math.PI / 2; rug.renderOrder = -8;
     } else box([3.3, 0.025, 2.65], material(0xDEDCCB), scene, [0.2, 0.02, 0.9]);
@@ -390,7 +382,6 @@ export const Room3D: React.FC<Props> = props => {
       if (s.tangleNodes !== previousNodes && !gesture) { previousNodes = s.tangleNodes; nodes = s.tangleNodes.map(p => [...p] as Vec3); drawTangle(); }
       target.lerp(desiredTarget, alpha); zoom += (desiredZoom - zoom) * alpha; camera.zoom = zoom; camera.updateProjectionMatrix();
       camera.position.set(target.x + Math.sin(yaw) * 16, target.y + 11.2, target.z + Math.cos(yaw) * 16); camera.lookAt(target);
-      leftWall.visible = Math.sin(yaw) > -0.01; back.visible = Math.cos(yaw) > -0.01;
       for (const id of Object.keys(groups) as ObjectId[]) {
         const g = groups[id]; const lifted = selected === id && (phase === 'picked' || phase === 'manipulating' || (live.current.blocked && (id === 'headphones' || id === 'game')));
         const destination = new THREE.Vector3(...poses[id].position); destination.y += lifted ? 0.16 : 0;
@@ -435,9 +426,9 @@ export const Room3D: React.FC<Props> = props => {
   return <section className="room-stage" aria-label="互动房间">
     <div ref={containerRef} className="room-canvas" />
     {simple && <span className="simple-label">简化渲染 · 交互仍可用</span>}
-    {failed ? <div className="room-fallback"><h2>换一种方式逛逛</h2><p>当前浏览器无法显示 3D 房间，作品、画板、声音和小游戏仍可打开。</p>{(['computer', 'drawing', 'tangle', 'headphones', 'game', 'diy'] as ModalType[]).map(id => <button key={id} className="soft-button" onClick={() => props.onSelectModal(id)}>{id === 'drawing' ? '画板' : id === 'diy' ? 'DIY' : names[id as ObjectId]}</button>)}</div> : <>
+    {failed ? <div className="room-fallback"><h2>Explore another way</h2><p>3D rendering is unavailable in this browser. You can still open the computer, canvas, audio and other room tools.</p>{(['computer', 'drawing', 'tangle', 'headphones', 'game', 'diy'] as ModalType[]).map(id => <button key={id} className="soft-button" onClick={() => props.onSelectModal(id)}>{id === 'drawing' ? '画板' : id === 'diy' ? 'DIY' : names[id as ObjectId]}</button>)}</div> : <>
       {guide && <div className="room-guide"><span className="eyebrow">MAKE YOURSELF AT HOME</span><h2>慢一点，也没关系。</h2><p>拖动空白转动房间，点击物件发现小事。</p><button onClick={() => setGuide(false)} aria-label="收起欢迎语">×</button></div>}
-      <div className="room-bottom-bar"><span>{interaction.id ? names[interaction.id] + ' · ' + phases[interaction.phase] : '鼠标拖动观察 · 手机上双指转动'}</span><button onClick={() => { handle.current?.resetView(); setGuide(true); }}>回到全景</button></div>
+      <div className="room-bottom-bar"><span>{interaction.id ? names[interaction.id] + ' · ' + phases[interaction.phase] : 'Drag to explore · Pinch or use two fingers on mobile'}</span><button onClick={() => { handle.current?.resetView(); setGuide(true); }}>Reset view</button></div>
       <div className="object-toolbar">
         <label className="sr-only" htmlFor="object-picker">选择要操作的物件</label>
         <select id="object-picker" value={interaction.id || ''} onChange={e => handle.current?.select(e.target.value as ObjectId)}><option value="" disabled>摆弄桌上的小物件</option>{Object.entries(names).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
