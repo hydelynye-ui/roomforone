@@ -489,7 +489,7 @@ export const Room3D: React.FC<Props> = props => {
       curtain.rotation.z = reduced.matches ? 0 : s.windowOpen ? Math.sin(milliseconds / 1700) * 0.035 : 0;
       dust.visible = !reduced.matches && !software && (s.weather === 'sunny' || s.weather === 'autumn');
       if (dust.visible) { dust.position.x = Math.sin(milliseconds / 4200) * 0.04; dust.position.y = Math.sin(milliseconds / 2600) * 0.05; }
-      rain.visible = s.weather === 'rain'; snow.visible = s.weather === 'snow' && s.windowOpen;
+      rain.visible = s.weather === 'rain'; snow.visible = s.weather === 'snow';
       const rainIntensity = s.weatherMode === 'live' && s.actualWeather?.precipitation !== undefined ? clamp(s.actualWeather.precipitation / 3, 0, 1) : 0.45;
       rainMat.opacity += ((0.18 + rainIntensity * 0.24) - rainMat.opacity) * alpha;
       if (rain.visible && !reduced.matches) {
