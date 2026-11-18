@@ -44,7 +44,7 @@ export const SwitchPanel: React.FC<Props> = ({ onClose }) => {
             {buttons.map(button => <button
               key={button.id}
               type="button"
-              className={button.className + (pressed === button.id ? ' is-pressed' : '')}
+              className={button.className + ' button-' + button.id.toLowerCase() + (pressed === button.id ? ' is-pressed' : '')}
               aria-label={button.id}
               aria-pressed={pressed === button.id}
               onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); press(button.id); }}
