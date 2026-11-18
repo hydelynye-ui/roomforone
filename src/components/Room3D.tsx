@@ -268,6 +268,8 @@ export const Room3D: React.FC<Props> = props => {
     };
     type Gesture = { id: number; x: number; y: number; lastX: number; hit: ReturnType<typeof pick>; moved: boolean; rotate: boolean; start: Vec3; pose: ObjectPose | null; nodes: Vec3[] };
     let gesture: Gesture | null = null;
+    let enteringComputer = false;
+    let enterTimer: number | null = null;
     const touches = new Map<number, number>();
     const cancel = () => {
       if (gesture?.hit && gesture.pose) { const id = gesture.hit.id as ObjectId; poses[id] = gesture.pose; nodes = gesture.nodes; drawTangle(); }
@@ -317,9 +319,8 @@ export const Room3D: React.FC<Props> = props => {
         }
       } else if (!g.hit && e.pointerType !== 'touch') { yaw = clamp(yaw + dx * 0.006, -0.26, 1.83); }
     };
-    let enteringComputer = false;
-    let enterTimer: number | null = null;
     const open = (id: string) => {
+      if (id === 'keyboard' || id === 'mouse') { open('computer'); return; }
       if (id === 'computer') {
         if (enteringComputer) return;
         enteringComputer = true;
@@ -414,7 +415,7 @@ export const Room3D: React.FC<Props> = props => {
       lampLight.position.copy(lamp.position).add(new THREE.Vector3(0.1, 0.5, 0)); lampLight.intensity += ((s.lampOn ? 3.5 : 0) - lampLight.intensity) * alpha;
       bulb.visible = s.lampOn; screenMat.emissiveIntensity = s.weather === 'night' ? 0.7 : 0.2;
       pane.position.x += ((s.windowOpen ? 1.08 : 0.59) - pane.position.x) * alpha;
-      sunlightMat.opacity += (((!isNight && (s.weather === 'sunny' || s.weather === 'autumn') ? 0.24 * daylight : 0) - sunlightMat.opacity) * alpha * 0.3;
+      sunlightMat.opacity += ((!isNight && (s.weather === 'sunny' || s.weather === 'autumn') ? 0.24 * daylight : 0) - sunlightMat.opacity) * alpha * 0.3;
       sunCross.visible = !software && sunlightMat.opacity > 0.12;
       curtain.rotation.z = reduced.matches ? 0 : s.windowOpen ? Math.sin(milliseconds / 1700) * 0.035 : 0;
       dust.visible = !reduced.matches && !software && (s.weather === 'sunny' || s.weather === 'autumn');
