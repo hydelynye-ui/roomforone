@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   ArrowLeft, Clapperboard, Disc3, Film, Infinity, Music2, NotebookPen,
-  Plus, Volume2, VolumeX, X, Minus, Trash2,
+  Plus, Volume2, VolumeX, X, Minus, Trash2, Play, Pause,
 } from 'lucide-react';
 import type { AudioTrack, CanvasNote, MovieEntry, RoomState } from '../types';
 import { InfiniteCanvasModal } from './InfiniteCanvasModal';
@@ -25,6 +25,8 @@ const apps: { id: AppId; name: string; description: string; icon: React.ReactNod
   { id: 'canvas', name: 'Infinite Canvas', description: 'Draw, collect and connect ideas', icon: <Infinity size={24} />, tone: 'blue' },
   { id: 'movie-book', name: 'Movie Book', description: 'Keep a little record of what you watch', icon: <Film size={22} />, tone: 'ochre' },
 ];
+
+const trackDefaults: Record<AudioTrack, number> = { rain: 0.65, wind: 0.35, birds: 0.5, lofi: 0.18 };
 
 const trackNames: Record<AudioTrack, string> = {
   rain: 'Rain',
@@ -111,6 +113,7 @@ export const ComputerModal: React.FC<ComputerModalProps> = ({
             return <div className="computer-track" key={track}>
               <span className={value > 0 ? 'computer-track-dot is-on' : 'computer-track-dot'} />
               <div><strong>{trackNames[track]}</strong><small>{value > 0 ? 'On' : 'Off'}</small></div>
+              <button className="computer-track-toggle" onClick={() => onUpdateTrack(track, value > 0 ? 0 : trackDefaults[track])} aria-label={value > 0 ? 'Pause ' + trackNames[track] : 'Play ' + trackNames[track]}>{value > 0 ? <Pause size={13} /> : <Play size={13} />}</button>
               <input aria-label={trackNames[track] + ' volume'} type="range" min="0" max="1" step="0.01" value={value} onChange={event => onUpdateTrack(track, Number(event.target.value))} />
               <b>{Math.round(value * 100)}%</b>
             </div>;
