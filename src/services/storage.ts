@@ -15,7 +15,7 @@ export const DEFAULT_ROOM_STATE: RoomState = {
   masterMute: true, // 按照设计规范：初始静音，待访客主动点击开启
   volumeWeather: 0.6,
   volumeAmbient: 0.4,
-  stickyNote: '给自己留一点空间，呼吸、放空，或者做一点喜欢的手作。',
+  stickyNote: 'A little space to slow down, breathe, and make something you enjoy.',
   roomRotation: Math.PI / 4,
   masterVolume: 0.7,
   audioTracks: { rain: 0.65, wind: 0.35, birds: 0.5, lofi: 0.18 },
@@ -51,7 +51,7 @@ export function normalizeRoomState(input: unknown): RoomState {
     : initialTangle();
   return {
     ...DEFAULT_ROOM_STATE, ...p,
-    weather: ['sunny', 'cloudy', 'rain', 'snow', 'autumn', 'night'].includes(p.weather || '') ? p.weather! : 'sunny',
+    weather: p.weather === 'night' ? (p.actualWeather?.preset && p.actualWeather.preset !== 'night' ? p.actualWeather.preset : 'sunny') : ['sunny', 'cloudy', 'rain', 'snow', 'autumn'].includes(p.weather || '') ? p.weather! : 'sunny',
     windowOpen: typeof p.windowOpen === 'boolean' ? p.windowOpen : true,
     lampOn: typeof p.lampOn === 'boolean' ? p.lampOn : false,
     masterMute: true,
