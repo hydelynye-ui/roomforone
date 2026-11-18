@@ -2,6 +2,7 @@ import type { AudioTrack, RoomState, TrackMix, WeatherPreset } from '../types';
 
 const mix: Record<WeatherPreset, TrackMix> = {
   sunny: { rain: 0.06, wind: 0.4, birds: 1, lofi: 0.35 },
+  cloudy: { rain: 0.12, wind: 0.55, birds: 0.3, lofi: 0.42 },
   rain: { rain: 1, wind: 0.7, birds: 0.1, lofi: 0.5 },
   snow: { rain: 0.06, wind: 0.65, birds: 0.1, lofi: 0.55 },
   autumn: { rain: 0.06, wind: 0.9, birds: 0.45, lofi: 0.45 },
@@ -21,7 +22,7 @@ class ProceduralAudioEngine {
   private init() {
     if (this.ctx) return;
     const Constructor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!Constructor) throw new Error('当前浏览器不支持环境音');
+    if (!Constructor) throw new Error('This browser does not support room audio');
     const ctx = this.ctx = new Constructor();
     this.master = ctx.createGain();
     this.master.gain.value = 0;
@@ -111,7 +112,7 @@ class ProceduralAudioEngine {
     // Only called directly by a user's explicit sound button, never by a scene/AI effect.
     this.init();
     if (this.ctx!.state !== 'running') await this.ctx!.resume();
-    if (this.ctx!.state !== 'running') throw new Error('浏览器未允许播放，请再点击开启环境音');
+    if (this.ctx!.state !== 'running') throw new Error('Playback is blocked by the browser. Click enable sound again.');
     this.muted = false;
     if (this.state) this.update(this.state);
     return false;
