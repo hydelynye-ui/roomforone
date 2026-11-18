@@ -120,6 +120,47 @@ export const Room3D: React.FC<Props> = props => {
     }); materials.add(skyMaterial);
     const simpleSky = material(0xBFDED5);
     const skyPlane = mesh(new THREE.PlaneGeometry(2.42, 1.84), software ? simpleSky : skyMaterial, scene, [2.96, 2.44, -0.2]); skyPlane.rotation.y = Math.PI / 2;
+    // A small low-poly outdoor world sits behind the right-side window.
+    const outdoor = new THREE.Group(); scene.add(outdoor);
+    const hillMatFar = material(0xA7B79E, { roughness: 1 });
+    const hillMatNear = material(0x91A58C, { roughness: 1 });
+    const farHill = mesh(new THREE.SphereGeometry(1, 8, 5), hillMatFar, outdoor, [3.045, 1.43, -0.38]);
+    farHill.scale.set(0.045, 0.38, 1.55);
+    const nearHill = mesh(new THREE.SphereGeometry(1, 8, 5), hillMatNear, outdoor, [3.055, 1.36, 0.48]);
+    nearHill.scale.set(0.05, 0.29, 1.05);
+    const treeTrunk = material(0x92775C, { roughness: 1 });
+    const treeCanopy = material(0x849D82, { roughness: 1 });
+    const treeGroups: THREE.Group[] = [];
+    for (const z of [-1.02, 0.76]) {
+      const tree = new THREE.Group(); tree.position.set(3.055, 1.55, z); outdoor.add(tree);
+      mesh(new THREE.CylinderGeometry(0.025, 0.04, 0.46, 6), treeTrunk, tree, [0, 0.23, 0]);
+      mesh(new THREE.ConeGeometry(0.22, 0.42, 6), treeCanopy, tree, [0, 0.53, 0]);
+      mesh(new THREE.ConeGeometry(0.16, 0.34, 6), treeCanopy, tree, [0, 0.78, 0]);
+      treeGroups.push(tree);
+    }
+    const cloudMaterial = material(0xF7F4EC, { transparent: true, opacity: 0.68, depthWrite: false, roughness: 1 });
+    const cloudGroups: THREE.Group[] = [];
+    for (let i = 0; i < 3; i++) {
+      const cloud = new THREE.Group(); cloud.position.set(3.055, 2.78 + (i % 2) * 0.2, -0.95 + i * 0.82); outdoor.add(cloud);
+      const a = mesh(new THREE.SphereGeometry(0.19, 7, 5), cloudMaterial, cloud, [0, 0, 0]);
+      const b = mesh(new THREE.SphereGeometry(0.14, 7, 5), cloudMaterial, cloud, [0, 0.08, 0.17]);
+      const d = mesh(new THREE.SphereGeometry(0.13, 7, 5), cloudMaterial, cloud, [0, 0.04, -0.16]);
+      a.scale.set(0.12, 0.72, 1.05); b.scale.set(0.1, 0.75, 0.8); d.scale.set(0.1, 0.7, 0.78);
+      cloudGroups.push(cloud);
+    }
+    const sunDiscMaterial = material(0xF1C98F, { emissive: 0xE8A85E, emissiveIntensity: 0.32, roughness: 1 });
+    const sunDisc = mesh(new THREE.SphereGeometry(0.16, 8, 6), sunDiscMaterial, outdoor, [3.045, 2.96, 0.62]);
+    const outdoorLeafPositions = new Float32Array(18 * 3);
+    for (let i = 0; i < 18; i++) {
+      outdoorLeafPositions[i * 3] = 3.035;
+      outdoorLeafPositions[i * 3 + 1] = 1.8 + Math.random() * 1.0;
+      outdoorLeafPositions[i * 3 + 2] = -1.2 + Math.random() * 2.4;
+    }
+    const outdoorLeafGeometry = new THREE.BufferGeometry(); geometries.add(outdoorLeafGeometry);
+    outdoorLeafGeometry.setAttribute('position', new THREE.BufferAttribute(outdoorLeafPositions, 3));
+    const outdoorLeafMaterial = new THREE.PointsMaterial({ color: 0xC98464, size: 0.035, transparent: true, opacity: 0.72, depthWrite: false });
+    materials.add(outdoorLeafMaterial);
+    const outdoorLeaves = new THREE.Points(outdoorLeafGeometry, outdoorLeafMaterial); scene.add(outdoorLeaves);
     const rainGeometry = new THREE.BufferGeometry(); geometries.add(rainGeometry);
     const rainPoints = new Float32Array(60 * 3);
     for (let i = 0; i < 60; i++) { rainPoints[i * 3] = 3.02; rainPoints[i * 3 + 1] = 1.6 + Math.random() * 1.65; rainPoints[i * 3 + 2] = -1.3 + Math.random() * 2.2; }
@@ -400,6 +441,26 @@ export const Room3D: React.FC<Props> = props => {
       }
       const hour = live.current.timeOfDay;
       const isNight = s.weather === 'night' || hour < 5.5 || hour >= 20;
+      const windSpeed = s.actualWeather?.windSpeed ?? (s.weather === 'autumn' ? 22 : 6);
+      const cloudOpacity = ({ sunny: 0.42, cloudy: 0.92, rain: 0.96, snow: 0.86, autumn: 0.5, night: 0.58 } as const)[s.weather];
+      cloudMaterial.opacity += (cloudOpacity - cloudMaterial.opacity) * alpha * 0.35;
+      sunDisc.visible = !isNight;
+      sunDisc.position.y += ((2.25 + daylight * 0.68) - sunDisc.position.y) * alpha;
+      sunDisc.position.z += ((-0.92 + (hour / 24) * 1.75) - sunDisc.position.z) * alpha;
+      treeGroups.forEach((tree, index) => { tree.rotation.z = reduced.matches ? 0 : Math.sin(milliseconds / (1900 + index * 420)) * Math.min(0.045, windSpeed * 0.0018); });
+      cloudGroups.forEach((cloud, index) => { cloud.position.z += (Math.sin(milliseconds / (5200 + index * 1100) + index) * 0.1 - (cloud.position.z - (-0.95 + index * 0.82))) * alpha * 0.22; });
+      outdoorLeaves.visible = !reduced.matches && (s.weather === 'autumn' || windSpeed >= 20);
+      if (outdoorLeaves.visible) {
+        for (let i = 0; i < 18; i++) {
+          outdoorLeafPositions[i * 3 + 1] -= dt * (0.08 + windSpeed * 0.004);
+          outdoorLeafPositions[i * 3 + 2] += dt * (0.12 + windSpeed * 0.009);
+          if (outdoorLeafPositions[i * 3 + 1] < 1.55 || outdoorLeafPositions[i * 3 + 2] > 1.25) {
+            outdoorLeafPositions[i * 3 + 1] = 2.8 + Math.random() * 0.3;
+            outdoorLeafPositions[i * 3 + 2] = -1.3 - Math.random() * 0.2;
+          }
+        }
+        outdoorLeafGeometry.attributes.position.needsUpdate = true;
+      }
       const daylight = clamp(Math.sin(((hour - 6) / 12) * Math.PI), 0, 1);
       const goldenHour = Math.max(clamp(1 - Math.abs(hour - 7) / 2.5, 0, 1), clamp(1 - Math.abs(hour - 18) / 3, 0, 1));
       const skyTarget = new THREE.Color(skies[s.weather]).lerp(new THREE.Color(0xE7B98E), goldenHour * (isNight ? 0 : 0.2)).lerp(new THREE.Color(0x263A4A), isNight ? 0.88 : 0);
