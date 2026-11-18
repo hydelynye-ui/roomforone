@@ -437,3 +437,50 @@ body { overflow: hidden; font-family: 'Plus Jakarta Sans', Inter, ui-sans-serif,
   .computer-shell, .computer-window, .computer-overlay { animation: none !important; }
   .switch-trigger, .computer-app-tile, .computer-dock button { transition: none !important; }
 }
+
+
+/* Infinite Canvas — one shared IndexedDB drawing draft plus draggable local notes */
+.infinite-canvas-overlay { position: fixed; z-index: 90; inset: 0; display: flex; flex-direction: column; padding: clamp(8px,2vw,22px); background: rgba(33,39,35,.42); backdrop-filter: blur(18px); }
+.infinite-canvas-shell { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(255,255,255,.8); border-radius: 22px; background: #f7f4ed; box-shadow: 0 28px 90px rgba(25,31,26,.22); }
+.infinite-canvas-header { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 0 18px; border-bottom: 1px solid rgba(137,119,94,.13); }
+.infinite-canvas-header > div:first-child { display: flex; align-items: center; gap: 10px; }
+.infinite-canvas-mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px; background: #dce5e8; color: #627f8a; }
+.infinite-canvas-header strong { display: block; color: #34312e; font-size: 11px; }
+.infinite-canvas-header small { display: block; margin-top: 3px; color: rgba(52,49,46,.45); font-size: 9px; }
+.infinite-canvas-actions { display: flex; align-items: center; gap: 5px; }
+.infinite-canvas-actions button, .infinite-canvas-tools button { min-height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 9px; border: 1px solid rgba(137,119,94,.14); border-radius: 9px; background: rgba(255,255,255,.58); color: rgba(52,49,46,.68); font-size: 9px; }
+.infinite-canvas-actions button:hover, .infinite-canvas-tools button:hover { background: #fff; }
+.infinite-canvas-actions span { min-width: 34px; text-align: center; color: rgba(52,49,46,.5); font-size: 9px; font-variant-numeric: tabular-nums; }
+.infinite-canvas-tools { min-height: 46px; display: flex; align-items: center; gap: 7px; padding: 6px 16px; border-bottom: 1px solid rgba(137,119,94,.1); background: rgba(239,232,220,.42); }
+.infinite-canvas-tools button.active { border-color: rgba(113,140,112,.4); background: rgba(145,165,140,.16); color: #617a61; }
+.infinite-canvas-tools > span { margin-left: auto; color: rgba(52,49,46,.4); font-size: 9px; }
+.infinite-canvas-colors { display: flex; align-items: center; gap: 6px; padding-right: 8px; border-right: 1px solid rgba(52,49,46,.12); }
+.infinite-canvas-colors button { width: 18px; min-height: 18px; height: 18px; padding: 0; border: 2px solid rgba(255,255,255,.8); border-radius: 50%; box-shadow: 0 0 0 1px rgba(52,49,46,.12); }
+.infinite-canvas-colors button.active { box-shadow: 0 0 0 2px #718c70; }
+.infinite-canvas-viewport { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; background-color: #ece9e0; background-image: radial-gradient(rgba(52,49,46,.12) .7px, transparent .7px); background-size: 22px 22px; cursor: grab; }
+.infinite-canvas-viewport:active { cursor: grabbing; }
+.infinite-canvas-world { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-origin: center center; }
+.infinite-canvas-drawing { position: absolute; left: -320px; top: -240px; width: 640px; height: 480px; border: 1px solid rgba(137,119,94,.2); border-radius: 5px; background: #faf7f0; box-shadow: 0 12px 36px rgba(52,49,46,.12); touch-action: none; cursor: crosshair; }
+.infinite-canvas-note { position: absolute; z-index: 2; width: 176px; min-height: 154px; padding: 10px 12px; border: 1px solid rgba(52,49,46,.08); border-radius: 4px 4px 12px 4px; box-shadow: 0 8px 20px rgba(52,49,46,.1); cursor: grab; touch-action: none; }
+.infinite-canvas-note:active { cursor: grabbing; }
+.infinite-canvas-note.tone-sage { background: #dce5d8; }
+.infinite-canvas-note.tone-clay { background: #f0ddd1; }
+.infinite-canvas-note.tone-cream { background: #f0e7c9; }
+.infinite-canvas-note header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; color: rgba(52,49,46,.38); font-size: 7px; letter-spacing: .15em; }
+.infinite-canvas-note header button { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 50%; background: transparent; color: rgba(52,49,46,.45); }
+.infinite-canvas-note header button:hover { background: rgba(52,49,46,.08); }
+.infinite-canvas-note textarea { width: 100%; min-height: 105px; resize: vertical; border: 0; outline: 0; background: transparent; color: rgba(52,49,46,.82); font-size: 10px; line-height: 1.6; cursor: text; touch-action: auto; }
+.infinite-canvas-note textarea::placeholder { color: rgba(52,49,46,.35); }
+.infinite-canvas-footer { min-height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; border-top: 1px solid rgba(137,119,94,.1); color: rgba(52,49,46,.42); font-size: 8px; }
+@media (max-width: 767px) {
+  .infinite-canvas-overlay { padding: 0; }
+  .infinite-canvas-shell { border: 0; border-radius: 0; }
+  .infinite-canvas-header { min-height: 54px; padding: 0 10px; }
+  .infinite-canvas-actions { gap: 3px; }
+  .infinite-canvas-actions button { min-width: 30px; padding: 0 6px; }
+  .infinite-canvas-actions button:nth-of-type(1), .infinite-canvas-actions button:nth-of-type(5) { font-size: 0; }
+  .infinite-canvas-tools { flex-wrap: wrap; padding: 7px 9px; }
+  .infinite-canvas-tools > span { display: none; }
+  .infinite-canvas-note { width: 154px; min-height: 138px; }
+  .infinite-canvas-note textarea { min-height: 92px; }
+}
