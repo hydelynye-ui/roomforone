@@ -24,7 +24,7 @@ export const App: React.FC = () => {
   const selectedCity = roomState.city ?? DEFAULT_CITY;
   const timeLabel = roomState.city ? getTimeLabel(selectedCity, now) : '--:--';
   const timePhase = roomState.city ? getTimePhase(selectedCity, now) : 'Demo Environment';
-  const timeOfDay = getLocalHour(selectedCity, now);
+  const timeOfDay = roomState.city ? getLocalHour(selectedCity, now) : now.getHours() + now.getMinutes() / 60;
   const stateRef = useRef(roomState), modalRef = useRef<HTMLDivElement>(null);
   stateRef.current = roomState;
   useEffect(() => {
