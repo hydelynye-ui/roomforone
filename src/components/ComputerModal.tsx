@@ -22,12 +22,12 @@ export const ComputerModal: React.FC<ComputerModalProps> = ({ onClose }) => {
             <div className="w-3 h-3 rounded-full bg-[#C9A47E]" />
             <div className="w-3 h-3 rounded-full bg-[#91A58C]" />
             <span className="ml-2 text-xs font-semibold text-[#34312E]/70 uppercase tracking-wider">
-              桌面电脑 · 作品集与项目 (Bento Grid)
+              PERSONAL DESKTOP · PROJECTS
             </span>
           </div>
           <button
             onClick={onClose}
-            aria-label="关闭作品面板"
+            aria-label="Close computer"
             className="p-1.5 rounded-full hover:bg-[#EFE8DC] text-[#34312E]/70 hover:text-[#34312E] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -38,9 +38,9 @@ export const ComputerModal: React.FC<ComputerModalProps> = ({ onClose }) => {
         <div className="p-6 overflow-y-auto space-y-4">
           <div className="p-4 rounded-2xl bg-[#EFE8DC]/50 border border-[#C9A47E]/20 flex items-start justify-between">
             <div>
-              <h2 className="text-base font-bold text-[#34312E]">欢迎来到 YY 的作品台</h2>
+              <h2 className="text-base font-bold text-[#34312E]">Welcome to your personal space</h2>
               <p className="text-xs text-[#34312E]/70 mt-1 leading-relaxed">
-                在这里可以浏览当前进行中与已完成的项目。所有数据在当前浏览器本地完全独立隔离。
+                Explore projects and personal work. Your data stays on this device.
               </p>
             </div>
             <Code2 className="w-5 h-5 text-[#C98464] shrink-0 mt-1" />
@@ -75,7 +75,7 @@ export const ComputerModal: React.FC<ComputerModalProps> = ({ onClose }) => {
 
                 <div className="mt-4 pt-3 border-t border-[#C9A47E]/15 flex items-center justify-between text-xs">
                   <span className="text-[11px] text-[#34312E]/50 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-[#91A58C]" /> 活跃维护
+                    <Sparkles className="w-3 h-3 text-[#91A58C]" /> In progress
                   </span>
                   {(proj.demoUrl || proj.link) && (
                     <a
@@ -84,7 +84,7 @@ export const ComputerModal: React.FC<ComputerModalProps> = ({ onClose }) => {
                       rel="noreferrer"
                       className="text-[#C98464] hover:underline flex items-center gap-1 font-medium"
                     >
-                      {proj.demoUrl ? '访问演示' : '查看项目'} <ExternalLink className="w-3 h-3" />
+                      {proj.demoUrl ? 'Open demo' : 'View project'} <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
                 </div>
