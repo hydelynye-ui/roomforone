@@ -16,7 +16,6 @@ export const App: React.FC = () => {
   const [roomState, setRoomState] = useState<RoomState>(loadRoomState);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [zenMode, setZenMode] = useState(false);
-  const [editTarget, setEditTarget] = useState<ObjectId | null>(null);
   const [notice, setNotice] = useState('');
   const [showCityPicker, setShowCityPicker] = useState(() => !loadRoomState().city);
   const [now, setNow] = useState(() => new Date());
@@ -137,7 +136,7 @@ export const App: React.FC = () => {
       onToggleZenMode={() => { setZenMode(z => !z); close(); }}
     /></div>
     <main className="workspace" inert={!!activeModal}>
-      <Room3D state={roomState} timeOfDay={timeOfDay} blocked={!!activeModal} editTarget={editTarget} onEditEnd={() => setEditTarget(null)} onSelectModal={setActiveModal} onToggleWindow={toggleWindow} onToggleLamp={toggleLamp} onPose={updatePose} onTangle={updateNodes} onRotation={updateRotation} />
+      <Room3D state={roomState} timeOfDay={timeOfDay} blocked={!!activeModal} onSelectModal={setActiveModal} onToggleWindow={toggleWindow} onToggleLamp={toggleLamp} onPose={updatePose} onTangle={updateNodes} onRotation={updateRotation} />
     </main>
     {showCityPicker && <CityPicker onSelect={handleSelectCity} />}
     {notice && <div role="status" className="room-notice">{notice}<button aria-label="Dismiss notice" onClick={() => setNotice('')}>×</button></div>}
