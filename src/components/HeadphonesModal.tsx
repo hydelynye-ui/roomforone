@@ -1,5 +1,5 @@
 import React from 'react';
-import { Headphones, Volume2, VolumeX, X } from 'lucide-react';
+import { Headphones, Volume2, VolumeX, X, Play, Pause } from 'lucide-react';
 import type { AudioTrack, RoomState, WeatherPreset } from '../types';
 
 interface Props {
@@ -10,22 +10,39 @@ interface Props {
   onSetWeather: (weather: WeatherPreset) => void;
   onClose: () => void;
 }
-const weatherLabels: Record<WeatherPreset, string> = { sunny: '晴日下午', rain: '安静雨天', snow: '冬日落雪', autumn: '清爽秋日', night: '暖灯夜晚' };
-const labels: Record<AudioTrack, string> = { rain: '雨声', wind: '风声', birds: '鸟鸣', lofi: 'lo-fi 音乐' };
+const weatherLabels: Partial<Record<WeatherPreset, string>> = {
+  sunny: 'Clear', cloudy: 'Cloudy', rain: 'Rain', snow: 'Snow', autumn: 'Windy',
+};
+const tracks: { id: AudioTrack; name: string; detail: string; restore: number }[] = [
+  { id: 'rain', name: 'Rain', detail: 'Soft rainfall against the window', restore: 0.65 },
+  { id: 'wind', name: 'Wind', detail: 'A little air moving outside', restore: 0.35 },
+  { id: 'birds', name: 'Birdsong', detail: 'Small sounds from the trees', restore: 0.5 },
+  { id: 'lofi', name: 'Lo-fi', detail: 'A quiet, original generated tone', restore: 0.18 },
+];
+
 export const HeadphonesModal: React.FC<Props> = ({ roomState: s, onToggleMute, onUpdateTrack, onMasterVolume, onSetWeather, onClose }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
-    <div className="w-full max-w-md bg-[#FAF7F0] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
-      <header className="modal-header"><Headphones size={20} /><h2>AirPods Max · 声音</h2><button onClick={onClose} aria-label="关闭声音面板"><X size={18} /></button></header>
+    <section className="w-full max-w-lg bg-[#FAF7F0] rounded-3xl shadow-2xl overflow-hidden flex flex-col" role="dialog" aria-modal="true" aria-label="AirPods Max sound controls">
+      <header className="modal-header"><Headphones size={20} /><h2>AirPods Max</h2><button onClick={onClose} aria-label="Close sound controls"><X size={18} /></button></header>
       <div className="modal-content space-y-5">
-        <div className="flex justify-between items-center"><span className="text-sm">留一点声音陪着自己</span><button className="soft-button" onClick={onToggleMute}>{s.masterMute ? <VolumeX size={16} /> : <Volume2 size={16} />}{s.masterMute ? '开启环境音' : '静音'}</button></div>
-        <label className="audio-slider"><span>总音量 <b>{Math.round(s.masterVolume * 100)}%</b></span><input aria-label="总音量" type="range" min="0" max="1" step="0.01" value={s.masterVolume} onChange={e => onMasterVolume(+e.target.value)} /></label>
-        <div className="grid grid-cols-2 gap-3">
-          {(Object.keys(labels) as AudioTrack[]).map(track => <label key={track} className="audio-slider paper-card rounded-xl p-3"><span>{labels[track]}<b>{Math.round(s.audioTracks[track] * 100)}%</b></span><input aria-label={labels[track]} type="range" min="0" max="1" step="0.01" value={s.audioTracks[track]} onChange={e => onUpdateTrack(track, +e.target.value)} /></label>)}
+        <div className="flex justify-between items-center"><div><strong className="text-sm">Room sound</strong><p className="text-xs text-[#34312E]/55 mt-1">A small atmosphere to keep you company.</p></div><button className="soft-button" onClick={onToggleMute}>{s.masterMute ? <VolumeX size={16} /> : <Volume2 size={16} />}{s.masterMute ? 'Enable sound' : 'Mute all'}</button></div>
+        <label className="audio-slider"><span>Master volume <b>{Math.round(s.masterVolume * 100)}%</b></span><input aria-label="Master volume" type="range" min="0" max="1" step="0.01" value={s.masterVolume} onChange={e => onMasterVolume(+e.target.value)} /></label>
+        <div className="space-y-2">
+          {tracks.map(track => {
+            const value = s.audioTracks[track.id];
+            const active = value > 0;
+            return <div key={track.id} className="headphone-track">
+              <div className="headphone-track-icon">{active ? <Volume2 size={16} /> : <VolumeX size={16} />}</div>
+              <div className="headphone-track-copy"><strong>{track.name}</strong><small>{track.detail}</small></div>
+              <button className="headphone-track-toggle" onClick={() => onUpdateTrack(track.id, active ? 0 : track.restore)} aria-label={active ? `Pause ${track.name}` : `Play ${track.name}`}>{active ? <Pause size={14} /> : <Play size={14} />}</button>
+              <input aria-label={track.name + ' volume'} type="range" min="0" max="1" step="0.01" value={value} onChange={e => onUpdateTrack(track.id, +e.target.value)} />
+              <b>{Math.round(value * 100)}%</b>
+            </div>;
+          })}
         </div>
-        <label className="block text-xs">当前天气<select aria-label="声音面板天气" value={s.weather} onChange={e => onSetWeather(e.target.value as WeatherPreset)} className="mt-2 w-full rounded-xl border border-[#C9A47E]/40 bg-white p-3">{Object.entries(weatherLabels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-        <p className="text-xs leading-relaxed text-[#34312E]/60">窗户{s.windowOpen ? '已打开，户外声音更清晰' : '已关闭，雨声和风声更轻、更低沉'}。天气决定基础混音，四条滑块可以分别调节；关闭面板不会停止播放。lo-fi 是本项目程序生成的轻和弦与旋律。</p>
-        <p className="text-xs text-[#34312E]/50">只控制网页声景，不连接真实蓝牙设备。</p>
+        <label className="block text-xs">Weather mix<select aria-label="Weather mix" value={s.weather === 'night' ? 'sunny' : s.weather} onChange={e => onSetWeather(e.target.value as WeatherPreset)} className="mt-2 w-full rounded-xl border border-[#C9A47E]/40 bg-white p-3">{Object.entries(weatherLabels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+        <p className="text-xs leading-relaxed text-[#34312E]/60">The open window brings outside sounds closer. Closing it softens rain and wind. Sound stays off until you enable it. Lo-fi is generated by this project and is not a commercial recording.</p>
       </div>
-    </div>
+    </section>
   </div>
 );
