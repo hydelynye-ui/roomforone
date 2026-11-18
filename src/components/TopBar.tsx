@@ -44,9 +44,9 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span className="room-time-value">{timeLabel}</span>
         </button>
         <span className="room-weather-status" title={roomState.weatherMode === 'live' ? 'Live weather' : 'Weather preview'}>
-          <span className={`live-indicator ${isRefreshingWeather ? 'is-refreshing' : ''}`} />
+          <span className={`live-indicator ${isRefreshingWeather ? 'is-refreshing' : ''} ${roomState.weatherMode === 'manual' ? 'is-manual' : ''}`} />
           {weatherIcon(roomState.weather)}
-          <span>{weatherName(roomState.weather)}{temperature === undefined ? '' : ` · ${temperature}°`}</span>
+          <span>{weatherName(roomState.weather)}{temperature === undefined ? '' : ` · ${temperature}°`}{roomState.weatherMode === 'manual' ? ' · Preview' : ' · Live'}</span>
         </span>
         <button className="room-icon-action" onClick={onOpenEnvironment} aria-label="Environment settings" title="Environment settings"><SlidersHorizontal size={16} /></button>
         <button className={`room-icon-action room-sound-action ${roomState.masterMute ? '' : 'is-playing'}`} onClick={onToggleMute} aria-label={roomState.masterMute ? 'Enable room sound' : 'Mute room sound'} title={roomState.masterMute ? 'Enable room sound' : 'Mute room sound'}>
