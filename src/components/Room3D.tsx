@@ -402,19 +402,26 @@ export const Room3D: React.FC<Props> = props => {
       const isNight = s.weather === 'night' || hour < 5.5 || hour >= 20;
       const daylight = clamp(Math.sin(((hour - 6) / 12) * Math.PI), 0, 1);
       const goldenHour = Math.max(clamp(1 - Math.abs(hour - 7) / 2.5, 0, 1), clamp(1 - Math.abs(hour - 18) / 3, 0, 1));
-      const skyTarget = new THREE.Color(skies[s.weather]).lerp(new THREE.Color(0x263A4A), isNight ? 0.88 : 0);
-      const backgroundTarget = new THREE.Color(backgrounds[s.weather]).lerp(new THREE.Color(0x293A42), isNight ? 0.82 : 0);
+      const skyTarget = new THREE.Color(skies[s.weather]).lerp(new THREE.Color(0xE7B98E), goldenHour * (isNight ? 0 : 0.2)).lerp(new THREE.Color(0x263A4A), isNight ? 0.88 : 0);
+      const backgroundTarget = new THREE.Color(backgrounds[s.weather]).lerp(new THREE.Color(0xE9C7A4), goldenHour * (isNight ? 0 : 0.12)).lerp(new THREE.Color(0x293A42), isNight ? 0.82 : 0);
       background.lerp(backgroundTarget, alpha * 0.3);
       skyMaterial.uniforms.sky.value.lerp(skyTarget, alpha * 0.3);
       simpleSky.color.lerp(skyTarget, alpha);
       skyMaterial.uniforms.weather.value = isNight ? 4 : weatherIndex[s.weather]; skyMaterial.uniforms.time.value = reduced.matches ? 0 : milliseconds / 1000;
       ambient.intensity += ((isNight ? 0.72 : 1.15 + daylight * 0.8) - ambient.intensity) * alpha * 0.3;
       const weatherSun = { sunny: 2.8, cloudy: 1.35, rain: 0.55, snow: 0.95, autumn: 2.4, night: 0.35 }[s.weather];
-      sun.intensity += ((weatherSun * (0.12 + daylight * 0.88) * (software ? 0.32 : 1)) - sun.intensity) * alpha * 0.3;
+      const solarStrength = isNight ? 0.045 : 0.12 + daylight * 0.88;
+      sun.intensity += ((weatherSun * solarStrength * (software ? 0.32 : 1)) - sun.intensity) * alpha * 0.3;
       sun.position.set(4.8 + Math.sin((hour - 12) / 12 * Math.PI) * 1.3, 2.2 + daylight * 4.8, -0.2 + Math.cos((hour - 12) / 12 * Math.PI) * 2.2);
       sun.color.lerp(nextColor.set(isNight ? 0x8FAABC : goldenHour > 0.15 ? 0xFFD19A : 0xFFE5BE), alpha);
+      const solarDrift = (hour - 12) / 12 * Math.PI;
+      const patchX = 1.45 + Math.sin(solarDrift) * 0.42;
+      const patchZ = -0.2 + Math.cos(solarDrift) * 0.42;
+      sunlight.position.x += (patchX - sunlight.position.x) * alpha;
+      sunlight.position.z += (patchZ - sunlight.position.z) * alpha;
+      sunCross.position.x = sunlight.position.x; sunCross.position.z = sunlight.position.z;
       lampLight.position.copy(lamp.position).add(new THREE.Vector3(0.1, 0.5, 0)); lampLight.intensity += ((s.lampOn ? 3.5 : 0) - lampLight.intensity) * alpha;
-      bulb.visible = s.lampOn; screenMat.emissiveIntensity = s.weather === 'night' ? 0.7 : 0.2;
+      bulb.visible = s.lampOn; screenMat.emissiveIntensity = isNight ? 0.7 : 0.2;
       pane.position.x += ((s.windowOpen ? 1.08 : 0.59) - pane.position.x) * alpha;
       sunlightMat.opacity += ((!isNight && (s.weather === 'sunny' || s.weather === 'autumn') ? 0.24 * daylight : 0) - sunlightMat.opacity) * alpha * 0.3;
       sunCross.visible = !software && sunlightMat.opacity > 0.12;
@@ -428,7 +435,7 @@ export const Room3D: React.FC<Props> = props => {
       }
       if (snow.visible && !reduced.matches) {
         const a = snowGeometry.attributes.position.array as Float32Array;
-        for (let i = 0; i < 60; i++) { a[i * 3 + 1] -= dt * 0.2; a[i * 3 + 2] += dt * 0.06; if (a[i * 3 + 1] < 1.9 || a[i * 3 + 2] > -2.72) { a[i * 3 + 1] = 2.8 + Math.random() * 0.3; a[i * 3 + 2] = -3.06; } }
+        for (let i = 0; i < 60; i++) { a[i * 3 + 1] -= dt * 0.2; a[i * 3 + 2] += dt * 0.06; if (a[i * 3 + 1] < 1.9 || a[i * 3 + 2] > 0.9) { a[i * 3] = 3.06; a[i * 3 + 1] = 2.8 + Math.random() * 0.3; a[i * 3 + 2] = -1.3 + Math.random() * 2.2; } }
         snowGeometry.attributes.position.needsUpdate = true;
       }
       renderer.render(scene, camera);
@@ -444,7 +451,7 @@ export const Room3D: React.FC<Props> = props => {
   return <section className="room-stage" aria-label="Open 3D room">
     <div ref={containerRef} className="room-canvas" />
     {simple && <span className="simple-label">Simplified rendering · interactions remain available</span>}
-    {failed ? <div className="room-fallback"><h2>Explore another way</h2><p>3D rendering is unavailable in this browser. You can still open the computer, canvas, audio and other room tools.</p>{(['computer', 'drawing', 'headphones', 'switch'] as ModalType[]).map(id => <button key={id} className="soft-button" onClick={() => props.onSelectModal(id)}>{id === 'drawing' ? 'Canvas' : id === 'diy' ? 'DIY' : names[id as ObjectId]}</button>)}</div> : <>
+    {failed ? <div className="room-fallback"><h2>Explore another way</h2><p>3D rendering is unavailable in this browser. You can still open the computer, canvas, audio and other room tools.</p>{(['computer', 'drawing', 'headphones', 'switch'] as ModalType[]).map(id => <button key={id} className="soft-button" onClick={() => props.onSelectModal(id)}>{id === 'drawing' ? 'Drawing Board' : id === 'switch' ? 'Switch Controller' : names[id as ObjectId]}</button>)}</div> : <>
       {guide && <div className="room-guide"><span className="eyebrow">MAKE YOURSELF AT HOME</span><h2>A little space to slow down.</h2><p>Drag the open space to look around. Select an object to explore.</p><button onClick={() => setGuide(false)} aria-label="Dismiss welcome message">×</button></div>}
       <div className="room-bottom-bar"><span>{interaction.id ? names[interaction.id] + ' · ' + phases[interaction.phase] : 'Drag to explore · Pinch to look around'}</span><button onClick={() => { handle.current?.resetView(); setGuide(true); }}>Reset view</button></div>
       <div className="object-toolbar">
