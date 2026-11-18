@@ -8,8 +8,6 @@ interface Props {
   state: RoomState;
   timeOfDay: number;
   blocked: boolean;
-  editTarget: ObjectId | null;
-  onEditEnd: () => void;
   onSelectModal: (modal: ModalType) => void;
   onToggleWindow: () => void;
   onToggleLamp: () => void;
@@ -58,7 +56,7 @@ export const Room3D: React.FC<Props> = props => {
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-6, 6, 5, -5, 0.1, 100);
     let yaw = props.state.roomRotation, selected: ObjectId | null = null;
-    let currentEdit: ObjectId | null = null, disposed = false;
+    let disposed = false;
     let phase: InteractionPhase = 'idle';
     const target = new THREE.Vector3(0, 1.25, 0), desiredTarget = target.clone();
     let zoom = 1, desiredZoom = 1;
@@ -429,7 +427,6 @@ export const Room3D: React.FC<Props> = props => {
       const s = live.current.state, alpha = reduced.matches ? 1 : 1 - Math.exp(-dt * 6);
       if (wasBlocked && !live.current.blocked) { selected = null; transition(null, 'idle'); resetFocus(); }
       wasBlocked = live.current.blocked;
-      if (live.current.editTarget !== currentEdit) { currentEdit = live.current.editTarget; if (currentEdit) handle.current?.select(currentEdit); else if (selected) resetFocus(); }
       if (s.tangleNodes !== previousNodes && !gesture) { previousNodes = s.tangleNodes; nodes = s.tangleNodes.map(p => [...p] as Vec3); drawTangle(); }
       target.lerp(desiredTarget, alpha); zoom += (desiredZoom - zoom) * alpha; camera.zoom = zoom; camera.updateProjectionMatrix();
       camera.position.set(target.x + Math.sin(yaw) * 16, target.y + 11.2, target.z + Math.cos(yaw) * 16); camera.lookAt(target);
@@ -525,7 +522,7 @@ export const Room3D: React.FC<Props> = props => {
         <select id="object-picker" value={interaction.id || ''} onChange={e => handle.current?.select(e.target.value as ObjectId)}><option value="" disabled>Explore an object</option>{Object.entries(names).filter(([id]) => id !== 'tools').map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
         {interaction.id && <><button className={rotateMode ? 'active' : ''} aria-pressed={rotateMode} onClick={() => setRotateMode(!rotateMode)}>{rotateMode ? 'Rotate' : 'Move'}</button><button onClick={() => handle.current?.rotate(0.26)} aria-label="Rotate selected object by fifteen degrees">↻</button><button onClick={() => handle.current?.reset()}>Reset object</button><button onClick={() => handle.current?.resetView()} aria-label="Exit object editing">×</button></>}
       </div>
-      {props.editTarget === 'tangle' && <div className="tangle-edit-tip">Tangle · Drag a link to reshape it<button onClick={() => handle.current?.resetView()}>Done</button></div>}
+      {interaction.id === 'tangle' && <div className="tangle-edit-tip">Tangle · Drag any link to reshape it<button onClick={() => handle.current?.resetView()}>Done</button></div>}
     </>}
   </section>;
 };
