@@ -152,7 +152,7 @@ export const ComputerModal: React.FC<ComputerModalProps> = ({
 
   return (
     <div className="computer-overlay" role="presentation" onClick={onClose} onKeyDown={event => {
-      if (event.key !== 'Escape' || (event.target as HTMLElement).closest('textarea,input')) return;
+      if (event.key !== 'Escape') return;
       event.stopPropagation();
       if (showCanvas) { setShowCanvas(false); setActiveApp(null); }
       else if (activeApp) setActiveApp(null);
