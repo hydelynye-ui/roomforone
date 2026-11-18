@@ -63,3 +63,39 @@ test('mood demo returns an allowed bounded configuration', async () => {
   assert.equal(result.weather, 'rain'); assert.equal(result.lampOn, true);
   assert.ok(result.volumeWeather >= 0 && result.volumeWeather <= 1); assert.ok(result.roomNote.length <= 120);
 });
+
+
+test('four desktop apps persist their content in the existing room state namespace', () => {
+  cache.clear();
+  const movieEntries = [{ id: 'movie-1', title: 'Perfect Days', year: 2023, note: 'A quiet afternoon.', createdAt: 10 }];
+  const canvasNotes = [{ id: 'canvas-1', text: 'A small idea', x: 140, y: -80, tone: 'sage' as const }];
+  saveRoomState({ notesText: 'Remember to slow down.', movieEntries, canvasNotes });
+  const loaded = loadRoomState();
+  assert.equal(loaded.notesText, 'Remember to slow down.');
+  assert.deepEqual(loaded.movieEntries, movieEntries);
+  assert.deepEqual(loaded.canvasNotes, canvasNotes);
+  assert.equal(cache.size, 1);
+  assert.ok(cache.has('roomforone-state-v1'));
+});
+
+test('canvas and movie data are bounded before being restored', () => {
+  const loaded = normalizeRoomState({
+    notesText: 'n'.repeat(22000),
+    movieEntries: [{ id: 'movie-1', title: 'm'.repeat(200), year: 3000, note: 'x'.repeat(1400), createdAt: 1 }],
+    canvasNotes: [{ id: 'canvas-1', text: 'x'.repeat(2200), x: 9000, y: -9000, tone: 'clay' }],
+  });
+  assert.equal(loaded.notesText.length, 20000);
+  assert.equal(loaded.movieEntries.length, 0);
+  assert.equal(loaded.canvasNotes[0].text.length, 2000);
+  assert.equal(loaded.canvasNotes[0].x, 4000);
+  assert.equal(loaded.canvasNotes[0].y, -4000);
+});
+
+test('legacy night selection is migrated to weather data; local time now controls night lighting', () => {
+  const migrated = normalizeRoomState({
+    weather: 'night',
+    actualWeather: { preset: 'rain', temperature: 12, windSpeed: 4, weatherCode: 61, fetchedAt: 1 },
+  });
+  assert.equal(migrated.weather, 'rain');
+  assert.equal(normalizeRoomState({ weather: 'night' }).weather, 'sunny');
+});
