@@ -1,4 +1,25 @@
-export type WeatherPreset = 'sunny' | 'rain' | 'snow' | 'autumn' | 'night';
+export type WeatherPreset = 'sunny' | 'cloudy' | 'rain' | 'snow' | 'autumn' | 'night';
+
+export interface CityConfig {
+  id: string;
+  name: string;
+  country: string;
+  timezone: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface WeatherSnapshot {
+  preset: WeatherPreset;
+  temperature: number;
+  windSpeed: number;
+  weatherCode: number;
+  fetchedAt: number;
+  sunrise?: string;
+  sunset?: string;
+  cloudCover?: number;
+  precipitation?: number;
+}
 
 export type ObjectId = 'computer' | 'keyboard' | 'mouse' | 'tangle' | 'headphones' | 'game' | 'lamp' | 'atmosphere' | 'tools';
 export type InteractionPhase = 'idle' | 'hover' | 'selected' | 'picked' | 'manipulating' | 'released';
@@ -23,6 +44,9 @@ export interface RoomState {
   tangleNodes: Vec3[];
   tangleNotes: TangleNote[];
   gameHighScore: number;
+  city?: CityConfig;
+  weatherMode?: 'live' | 'manual';
+  actualWeather?: WeatherSnapshot;
 }
 
 export type ModalType = 
