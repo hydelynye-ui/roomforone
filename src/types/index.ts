@@ -54,7 +54,18 @@ export interface RoomState {
   actualWeather?: WeatherSnapshot;
 }
 
-export type ModalType = 'computer' | 'drawing' | 'switch' | 'headphones' | 'atmosphere' | null;
+export type ModalType =
+  | 'computer'
+  | 'drawing'
+  | 'game'
+  | 'switch'
+  | 'diy'
+  | 'tangle'
+  | 'headphones'
+  | 'atmosphere'
+  | 'mood-ai'
+  | 'about'
+  | null;
 
 export interface ProjectItem {
   id: string;
