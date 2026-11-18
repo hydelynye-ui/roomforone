@@ -15,7 +15,7 @@ export const DrawingModal: React.FC<DrawingModalProps> = ({ onClose }) => {
   const [savedNotice, setSavedNotice] = useState(false);
   const [exportUrl, setExportUrl] = useState('');
   const [ready, setReady] = useState(false);
-  const [saveStatus, setSaveStatus] = useState('Restoring this device's draft…');
+  const [saveStatus, setSaveStatus] = useState("Restoring this device's draft…");
 
   const colors = [
     { hex: '#34312E', name: 'Charcoal' },
