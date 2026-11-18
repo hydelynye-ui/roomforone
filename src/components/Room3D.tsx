@@ -6,6 +6,7 @@ import { constrainPose, deformTangle, INITIAL_POSES, initialTangle, clamp } from
 
 interface Props {
   state: RoomState;
+  timeOfDay: number;
   blocked: boolean;
   editTarget: ObjectId | null;
   onEditEnd: () => void;
@@ -100,7 +101,7 @@ export const Room3D: React.FC<Props> = props => {
     } else box([3.3, 0.025, 2.65], material(0xDEDCCB), scene, [0.2, 0.02, 0.9]);
     for (let i = 0; i < (software ? 0 : 8); i++) box([0.012, 0.003, 2.55], paper, scene, [-1.2 + i * 0.4, 0.035, 0.9]).renderOrder = software ? -7 : 0;
 
-    const windowGroup = new THREE.Group(); windowGroup.position.set(0.55, 2.44, -3.12); scene.add(windowGroup);
+    const windowGroup = new THREE.Group(); windowGroup.position.set(3.12, 2.44, -0.2); windowGroup.rotation.y = -Math.PI / 2; scene.add(windowGroup);
     for (const x of [-1.2, 0, 1.2]) box([0.09, 1.86, 0.13], wood, windowGroup, [x, 0, 0]);
     for (const y of [-0.92, 0.92]) box([2.48, 0.09, 0.13], wood, windowGroup, [0, y, 0]);
     box([2.7, 0.09, 0.4], darkWood, windowGroup, [0, -0.96, 0.08]);
@@ -118,10 +119,10 @@ export const Room3D: React.FC<Props> = props => {
         gl_FragColor=vec4(c,1.); }`,
     }); materials.add(skyMaterial);
     const simpleSky = material(0xBFDED5);
-    mesh(new THREE.PlaneGeometry(2.42, 1.84), software ? simpleSky : skyMaterial, scene, [0.55, 2.44, -3.33]);
+    const skyPlane = mesh(new THREE.PlaneGeometry(2.42, 1.84), software ? simpleSky : skyMaterial, scene, [3.34, 2.44, -0.2]); skyPlane.rotation.y = -Math.PI / 2;
     const rainGeometry = new THREE.BufferGeometry(); geometries.add(rainGeometry);
     const rainPoints = new Float32Array(60 * 3);
-    for (let i = 0; i < 60; i++) { rainPoints[i * 3] = -0.55 + Math.random() * 2.2; rainPoints[i * 3 + 1] = 1.6 + Math.random() * 1.65; rainPoints[i * 3 + 2] = -3.02; }
+    for (let i = 0; i < 60; i++) { rainPoints[i * 3] = 3.02; rainPoints[i * 3 + 1] = 1.6 + Math.random() * 1.65; rainPoints[i * 3 + 2] = -1.3 + Math.random() * 2.2; }
     rainGeometry.setAttribute('position', new THREE.BufferAttribute(rainPoints, 3));
     const rainMat = new THREE.PointsMaterial({ color: 0xBCDDE3, size: 0.024, transparent: true, opacity: 0.3, depthWrite: false }); materials.add(rainMat);
     const rain = new THREE.Points(rainGeometry, rainMat); scene.add(rain);
@@ -135,13 +136,13 @@ export const Room3D: React.FC<Props> = props => {
     const dustMat = new THREE.PointsMaterial({ color: 0xFFF4D0, size: 0.016, transparent: true, opacity: 0.45, depthWrite: false }); materials.add(dustMat);
     const dust = new THREE.Points(dustGeo, dustMat); scene.add(dust);
     const sunlightMat = new THREE.MeshBasicMaterial({ color: 0xFFE5AB, transparent: true, opacity: 0.2, depthWrite: false }); materials.add(sunlightMat);
-    const sunlight = box([2.3, 0.001, 2.3], sunlightMat, scene, [0.6, 0.044, 0.2]); sunlight.rotation.y = -0.45; sunlight.renderOrder = software ? -6 : 0; sunlight.visible = !software;
-    const sunCross = new THREE.Group(); sunCross.position.set(0.6, 0.05, 0.2); sunCross.rotation.y = -0.45; scene.add(sunCross);
+    const sunlight = box([2.3, 0.001, 2.3], sunlightMat, scene, [1.45, 0.044, -0.2]); sunlight.rotation.y = 0.45; sunlight.renderOrder = software ? -6 : 0; sunlight.visible = !software;
+    const sunCross = new THREE.Group(); sunCross.position.set(1.45, 0.05, -0.2); sunCross.rotation.y = 0.45; scene.add(sunCross);
     box([0.045, 0.002, 2.3], material(0xAA9474), sunCross); box([2.3, 0.002, 0.045], material(0xAA9474), sunCross);
-    const curtain = box([0.38, 1.9, 0.06], material(0xC8CCB4), scene, [-0.85, 2.47, -2.99]);
-    box([2.9, 0.06, 0.06], darkWood, scene, [0.55, 3.45, -3.0]);
-    cylinder(0.16, 0.23, terracotta, scene, [1.43, 1.63, -2.9]);
-    for (let i = 0; i < 5; i++) { const leaf = mesh(new THREE.SphereGeometry(0.13, 6, 5), sage, scene, [1.43 + Math.sin(i) * 0.14, 1.85 + i * 0.045, -2.88]); leaf.scale.set(0.6, 1.5, 0.65); }
+    const curtain = box([0.06, 1.9, 0.38], material(0xC8CCB4), scene, [2.99, 2.47, -1.28]);
+    box([0.06, 0.06, 2.9], darkWood, scene, [3.0, 3.45, -0.2]);
+    cylinder(0.16, 0.23, terracotta, scene, [2.55, 1.63, -1.72]);
+    for (let i = 0; i < 5; i++) { const leaf = mesh(new THREE.SphereGeometry(0.13, 6, 5), sage, scene, [2.55 + Math.sin(i) * 0.14, 1.85 + i * 0.045, -1.72]); leaf.scale.set(0.6, 1.5, 0.65); }
 
     // Existing desk, chair and easel, with props split into individually manipulable groups.
     box([4.7, 0.13, 1.75], wood, scene, [0, 1.2, -1.85]);
@@ -220,13 +221,7 @@ export const Room3D: React.FC<Props> = props => {
     };
     drawTangle(); register(tangle, 'tangle');
 
-    // A few paper details remain part of the quiet room rather than a separate content system.
-    for (let i = 0; i < 3; i++) {
-      const photo = box([0.48, 0.64, 0.025], paper, scene, [-1.7 + i * 0.62, 2.75 + i % 2 * 0.1, -3.08]);
-      photo.rotation.z = (i - 1) * 0.08;
-      box([0.36, 0.38, 0.015], [sage, terracotta, wood][i], photo, [0, 0.05, 0.025]);
-      box([0.19, 0.09, 0.015], material(0xDDD0B6), photo, [0, 0.33, 0.025]); register(photo, 'about');
-    }
+    // The open space stays uncluttered; personal content lives inside the computer apps.
     const sticky = box([0.32, 0.005, 0.27], material(0xEAD4A5), scene, [-1.8, 1.272, -1.48]); sticky.rotation.y = -0.2; register(sticky, 'mood-ai');
 
     const transition = (id: ObjectId | null, next: InteractionPhase) => { phase = next; setInteraction({ id, phase: next }); };
@@ -279,7 +274,7 @@ export const Room3D: React.FC<Props> = props => {
       gesture = null; transition(selected, selected ? 'selected' : 'idle');
     };
     const onDown = (e: PointerEvent) => {
-      if (live.current.blocked) return;
+      if (live.current.blocked || enteringComputer) return;
       if (e.pointerType === 'touch') touches.set(e.pointerId, e.clientX);
       if (touches.size > 1) { cancel(); renderer.domElement.setPointerCapture(e.pointerId); return; }
       const hit = pick(e), id = hit?.id as ObjectId;
@@ -322,10 +317,21 @@ export const Room3D: React.FC<Props> = props => {
         }
       } else if (!g.hit && e.pointerType !== 'touch') { yaw = clamp(yaw + dx * 0.006, -0.26, 1.83); }
     };
+    let enteringComputer = false;
+    let enterTimer: number | null = null;
     const open = (id: string) => {
+      if (id === 'computer') {
+        if (enteringComputer) return;
+        enteringComputer = true;
+        selected = 'computer';
+        transition('computer', 'selected');
+        desiredTarget.set(...poses.computer.position); desiredTarget.y += 0.58; desiredZoom = 3.4;
+        enterTimer = window.setTimeout(() => { enteringComputer = false; live.current.onSelectModal('computer'); }, 560);
+        return;
+      }
       if (id === 'window') { live.current.onToggleWindow(); return; }
       if (id === 'lamp') { live.current.onToggleLamp(); return; }
-      const modal: Record<string, ModalType> = { computer: 'computer', keyboard: 'computer', mouse: 'computer', tangle: 'tangle', headphones: 'headphones', game: 'game', tools: 'diy', drawing: 'drawing', diy: 'diy', atmosphere: 'headphones', about: 'about', 'mood-ai': 'mood-ai' };
+      const modal: Record<string, ModalType> = { keyboard: 'computer', mouse: 'computer', tangle: 'tangle', headphones: 'headphones', game: 'switch', tools: 'diy', drawing: 'drawing', diy: 'diy', atmosphere: 'headphones', 'mood-ai': 'mood-ai' };
       live.current.onSelectModal(modal[id] || null);
     };
     const onUp = (e: PointerEvent) => {
@@ -365,12 +371,12 @@ export const Room3D: React.FC<Props> = props => {
       camera.updateProjectionMatrix(); renderer.setSize(w, h);
     };
     const observer = new ResizeObserver(resize); observer.observe(host); resize();
-    const backgrounds = { sunny: 0xEFE8DC, rain: 0xDBE1DF, snow: 0xE2E8E4, autumn: 0xEDE1CF, night: 0x293A42 };
-    const skies = { sunny: 0xBFDED5, rain: 0x9EAFB8, snow: 0xD7E2E3, autumn: 0xE6CD9D, night: 0x23374C };
-    const weatherIndex = { sunny: 0, rain: 1, snow: 2, autumn: 3, night: 4 };
+    const backgrounds = { sunny: 0xEFE8DC, cloudy: 0xE5E5DF, rain: 0xDBE1DF, snow: 0xE2E8E4, autumn: 0xEDE1CF, night: 0x293A42 };
+    const skies = { sunny: 0xBFDED5, cloudy: 0xB8C5C6, rain: 0x9EAFB8, snow: 0xD7E2E3, autumn: 0xE6CD9D, night: 0x23374C };
+    const weatherIndex = { sunny: 0, cloudy: 0.5, rain: 1, snow: 2, autumn: 3, night: 4 };
     const background = new THREE.Color(backgrounds[props.state.weather]); scene.background = background;
     const nextColor = new THREE.Color();
-    let lastTime = 0, frame = 0, lastRender = 0;
+    let lastTime = 0, frame = 0, lastRender = 0, wasBlocked = false;
     const animate = (milliseconds: number) => {
       if (disposed) return; frame = requestAnimationFrame(animate);
       if (document.hidden) { lastTime = milliseconds; return; }
@@ -378,6 +384,8 @@ export const Room3D: React.FC<Props> = props => {
       lastRender = milliseconds;
       const dt = Math.min(0.05, (milliseconds - lastTime) / 1000 || 0.016); lastTime = milliseconds;
       const s = live.current.state, alpha = reduced.matches ? 1 : 1 - Math.exp(-dt * 6);
+      if (wasBlocked && !live.current.blocked) { selected = null; transition(null, 'idle'); resetFocus(); }
+      wasBlocked = live.current.blocked;
       if (live.current.editTarget !== currentEdit) { currentEdit = live.current.editTarget; if (currentEdit) handle.current?.select(currentEdit); else if (selected) resetFocus(); }
       if (s.tangleNodes !== previousNodes && !gesture) { previousNodes = s.tangleNodes; nodes = s.tangleNodes.map(p => [...p] as Vec3); drawTangle(); }
       target.lerp(desiredTarget, alpha); zoom += (desiredZoom - zoom) * alpha; camera.zoom = zoom; camera.updateProjectionMatrix();
@@ -388,17 +396,25 @@ export const Room3D: React.FC<Props> = props => {
         g.position.lerp(destination, alpha); g.rotation.y = poses[id].rotation;
         const scale = lifted ? 1.025 : 1; g.scale.lerp(new THREE.Vector3(scale, scale, scale), alpha);
       }
-      background.lerp(nextColor.set(backgrounds[s.weather]), alpha * 0.3);
-      skyMaterial.uniforms.sky.value.lerp(nextColor.set(skies[s.weather]), alpha * 0.3);
-      simpleSky.color.lerp(nextColor.set(skies[s.weather]), alpha);
-      skyMaterial.uniforms.weather.value = weatherIndex[s.weather]; skyMaterial.uniforms.time.value = reduced.matches ? 0 : milliseconds / 1000;
-      ambient.intensity += ((s.weather === 'night' ? 0.65 : 2.1) - ambient.intensity) * alpha * 0.3;
-      sun.intensity += (({ sunny: 2.6, rain: 0.5, snow: 0.9, autumn: 2.3, night: 0.15 }[s.weather]) * (software ? 0.32 : 1) - sun.intensity) * alpha * 0.3;
-      sun.color.lerp(nextColor.set(s.weather === 'autumn' ? 0xFFD38A : s.weather === 'night' ? 0x8FAABC : 0xFFE5BE), alpha);
+      const hour = live.current.timeOfDay;
+      const isNight = s.weather === 'night' || hour < 5.5 || hour >= 20;
+      const daylight = clamp(Math.sin(((hour - 6) / 12) * Math.PI), 0, 1);
+      const goldenHour = Math.max(clamp(1 - Math.abs(hour - 7) / 2.5, 0, 1), clamp(1 - Math.abs(hour - 18) / 3, 0, 1));
+      const skyTarget = new THREE.Color(skies[s.weather]).lerp(new THREE.Color(0x263A4A), isNight ? 0.88 : 0);
+      const backgroundTarget = new THREE.Color(backgrounds[s.weather]).lerp(new THREE.Color(0x293A42), isNight ? 0.82 : 0);
+      background.lerp(backgroundTarget, alpha * 0.3);
+      skyMaterial.uniforms.sky.value.lerp(skyTarget, alpha * 0.3);
+      simpleSky.color.lerp(skyTarget, alpha);
+      skyMaterial.uniforms.weather.value = isNight ? 4 : weatherIndex[s.weather]; skyMaterial.uniforms.time.value = reduced.matches ? 0 : milliseconds / 1000;
+      ambient.intensity += ((isNight ? 0.72 : 1.15 + daylight * 0.8) - ambient.intensity) * alpha * 0.3;
+      const weatherSun = { sunny: 2.8, cloudy: 1.35, rain: 0.55, snow: 0.95, autumn: 2.4, night: 0.35 }[s.weather];
+      sun.intensity += ((weatherSun * (0.12 + daylight * 0.88) * (software ? 0.32 : 1)) - sun.intensity) * alpha * 0.3;
+      sun.position.set(4.8 + Math.sin((hour - 12) / 12 * Math.PI) * 1.3, 2.2 + daylight * 4.8, -0.2 + Math.cos((hour - 12) / 12 * Math.PI) * 2.2);
+      sun.color.lerp(nextColor.set(isNight ? 0x8FAABC : goldenHour > 0.15 ? 0xFFD19A : 0xFFE5BE), alpha);
       lampLight.position.copy(lamp.position).add(new THREE.Vector3(0.1, 0.5, 0)); lampLight.intensity += ((s.lampOn ? 3.5 : 0) - lampLight.intensity) * alpha;
       bulb.visible = s.lampOn; screenMat.emissiveIntensity = s.weather === 'night' ? 0.7 : 0.2;
       pane.position.x += ((s.windowOpen ? 1.08 : 0.59) - pane.position.x) * alpha;
-      sunlightMat.opacity += (((s.weather === 'sunny' || s.weather === 'autumn') ? 0.24 : 0) - sunlightMat.opacity) * alpha * 0.3;
+      sunlightMat.opacity += (((!isNight && (s.weather === 'sunny' || s.weather === 'autumn') ? 0.24 * daylight : 0) - sunlightMat.opacity) * alpha * 0.3;
       sunCross.visible = !software && sunlightMat.opacity > 0.12;
       curtain.rotation.z = reduced.matches ? 0 : s.windowOpen ? Math.sin(milliseconds / 1700) * 0.035 : 0;
       dust.visible = !reduced.matches && !software && (s.weather === 'sunny' || s.weather === 'autumn');
@@ -417,7 +433,7 @@ export const Room3D: React.FC<Props> = props => {
     };
     frame = requestAnimationFrame(animate);
     return () => {
-      disposed = true; cancelAnimationFrame(frame); observer.disconnect(); handle.current = null;
+      disposed = true; cancelAnimationFrame(frame); if (enterTimer !== null) window.clearTimeout(enterTimer); observer.disconnect(); handle.current = null;
       el.removeEventListener('pointerdown', downListener); el.removeEventListener('pointermove', moveListener); el.removeEventListener('pointerup', upListener); el.removeEventListener('pointercancel', cancelListener); el.removeEventListener('contextmenu', onContext); el.removeEventListener('webglcontextlost', onLoss); window.removeEventListener('keydown', onKey); window.removeEventListener('blur', onBlur);
       geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); textures.forEach(t => t.dispose()); if (renderer instanceof THREE.WebGLRenderer) renderer.dispose(); el.remove();
     };
@@ -425,16 +441,16 @@ export const Room3D: React.FC<Props> = props => {
 
   return <section className="room-stage" aria-label="互动房间">
     <div ref={containerRef} className="room-canvas" />
-    {simple && <span className="simple-label">简化渲染 · 交互仍可用</span>}
-    {failed ? <div className="room-fallback"><h2>Explore another way</h2><p>3D rendering is unavailable in this browser. You can still open the computer, canvas, audio and other room tools.</p>{(['computer', 'drawing', 'tangle', 'headphones', 'game', 'diy'] as ModalType[]).map(id => <button key={id} className="soft-button" onClick={() => props.onSelectModal(id)}>{id === 'drawing' ? '画板' : id === 'diy' ? 'DIY' : names[id as ObjectId]}</button>)}</div> : <>
-      {guide && <div className="room-guide"><span className="eyebrow">MAKE YOURSELF AT HOME</span><h2>慢一点，也没关系。</h2><p>拖动空白转动房间，点击物件发现小事。</p><button onClick={() => setGuide(false)} aria-label="收起欢迎语">×</button></div>}
-      <div className="room-bottom-bar"><span>{interaction.id ? names[interaction.id] + ' · ' + phases[interaction.phase] : 'Drag to explore · Pinch or use two fingers on mobile'}</span><button onClick={() => { handle.current?.resetView(); setGuide(true); }}>Reset view</button></div>
+    {simple && <span className="simple-label">Simplified rendering · interactions remain available</span>}
+    {failed ? <div className="room-fallback"><h2>Explore another way</h2><p>3D rendering is unavailable in this browser. You can still open the computer, canvas, audio and other room tools.</p>{(['computer', 'drawing', 'tangle', 'headphones', 'game', 'diy'] as ModalType[]).map(id => <button key={id} className="soft-button" onClick={() => props.onSelectModal(id)}>{id === 'drawing' ? 'Canvas' : id === 'diy' ? 'DIY' : names[id as ObjectId]}</button>)}</div> : <>
+      {guide && <div className="room-guide"><span className="eyebrow">MAKE YOURSELF AT HOME</span><h2>慢一点，也没关系。</h2><p>Drag the open space to look around. Select an object to explore.</p><button onClick={() => setGuide(false)} aria-label="Dismiss welcome message">×</button></div>}
+      <div className="room-bottom-bar"><span>{interaction.id ? names[interaction.id] + ' · ' + phases[interaction.phase] : 'Drag to explore · Pinch to look around'}</span><button onClick={() => { handle.current?.resetView(); setGuide(true); }}>Reset view</button></div>
       <div className="object-toolbar">
         <label className="sr-only" htmlFor="object-picker">选择要操作的物件</label>
-        <select id="object-picker" value={interaction.id || ''} onChange={e => handle.current?.select(e.target.value as ObjectId)}><option value="" disabled>摆弄桌上的小物件</option>{Object.entries(names).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
-        {interaction.id && <><button className={rotateMode ? 'active' : ''} aria-pressed={rotateMode} onClick={() => setRotateMode(!rotateMode)}>{rotateMode ? '旋转模式' : '拖动模式'}</button><button onClick={() => handle.current?.rotate(0.26)} aria-label="将选中物件旋转十五度">↻</button><button onClick={() => handle.current?.reset()}>恢复原状</button><button onClick={() => handle.current?.resetView()} aria-label="退出物件编辑">×</button></>}
+        <select id="object-picker" value={interaction.id || ''} onChange={e => handle.current?.select(e.target.value as ObjectId)}><option value="" disabled>Explore an object</option>{Object.entries(names).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
+        {interaction.id && <><button className={rotateMode ? 'active' : ''} aria-pressed={rotateMode} onClick={() => setRotateMode(!rotateMode)}>{rotateMode ? 'Rotate' : 'Move'}</button><button onClick={() => handle.current?.rotate(0.26)} aria-label="Rotate selected object by fifteen degrees">↻</button><button onClick={() => handle.current?.reset()}>Reset object</button><button onClick={() => handle.current?.resetView()} aria-label="Exit object editing">×</button></>}
       </div>
-      {props.editTarget === 'tangle' && <div className="tangle-edit-tip">编辑 Tangle · 拖动橙色或粉色连接段改变形状<button onClick={() => handle.current?.resetView()}>完成</button></div>}
+      {props.editTarget === 'tangle' && <div className="tangle-edit-tip">Tangle · Drag a link to reshape it<button onClick={() => handle.current?.resetView()}>Done</button></div>}
     </>}
   </section>;
 };
