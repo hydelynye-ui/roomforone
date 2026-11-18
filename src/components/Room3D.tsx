@@ -443,7 +443,10 @@ export const Room3D: React.FC<Props> = props => {
       const isNight = s.weather === 'night' || hour < 5.5 || hour >= 20;
       const daylight = clamp(Math.sin(((hour - 6) / 12) * Math.PI), 0, 1);
       const windSpeed = s.actualWeather?.windSpeed ?? (s.weather === 'autumn' ? 22 : 6);
-      const cloudOpacity = ({ sunny: 0.42, cloudy: 0.92, rain: 0.96, snow: 0.86, autumn: 0.5, night: 0.58 } as const)[s.weather];
+      const liveCloudCover = s.weatherMode === 'live' ? s.actualWeather?.cloudCover : undefined;
+      const cloudOpacity = liveCloudCover === undefined
+        ? ({ sunny: 0.42, cloudy: 0.92, rain: 0.96, snow: 0.86, autumn: 0.5, night: 0.58 } as const)[s.weather]
+        : 0.18 + clamp(liveCloudCover / 100, 0, 1) * 0.78;
       cloudMaterial.opacity += (cloudOpacity - cloudMaterial.opacity) * alpha * 0.35;
       sunDisc.visible = !isNight;
       sunDisc.position.y += ((2.25 + daylight * 0.68) - sunDisc.position.y) * alpha;
@@ -490,6 +493,8 @@ export const Room3D: React.FC<Props> = props => {
       dust.visible = !reduced.matches && !software && (s.weather === 'sunny' || s.weather === 'autumn');
       if (dust.visible) { dust.position.x = Math.sin(milliseconds / 4200) * 0.04; dust.position.y = Math.sin(milliseconds / 2600) * 0.05; }
       rain.visible = s.weather === 'rain'; snow.visible = s.weather === 'snow' && s.windowOpen;
+      const rainIntensity = s.weatherMode === 'live' && s.actualWeather?.precipitation !== undefined ? clamp(s.actualWeather.precipitation / 3, 0, 1) : 0.45;
+      rainMat.opacity += ((0.18 + rainIntensity * 0.24) - rainMat.opacity) * alpha;
       if (rain.visible && !reduced.matches) {
         for (let i = 0; i < 60; i++) { rainPoints[i * 3 + 1] -= dt * (0.2 + i % 4 * 0.1); if (rainPoints[i * 3 + 1] < 1.61) rainPoints[i * 3 + 1] = 3.25; }
         rainGeometry.attributes.position.needsUpdate = true;
