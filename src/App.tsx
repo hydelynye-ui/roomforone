@@ -21,6 +21,7 @@ export const App: React.FC = () => {
   const [showCityPicker, setShowCityPicker] = useState(() => !loadRoomState().city);
   const [now, setNow] = useState(() => new Date());
   const [isRefreshingWeather, setIsRefreshingWeather] = useState(false);
+  const weatherRequest = useRef(0);
   const selectedCity = roomState.city ?? DEFAULT_CITY;
   const timeLabel = roomState.city ? getTimeLabel(selectedCity, now) : '--:--';
   const timePhase = roomState.city ? getTimePhase(selectedCity, now) : 'Demo Environment';
@@ -39,19 +40,22 @@ export const App: React.FC = () => {
     if (!saveRoomState(next)) setNotice('This device could not save your changes. Please export important canvas work.');
   }, []);
   const refreshWeather = useCallback(async (city: CityConfig) => {
+    const requestId = ++weatherRequest.current;
     setIsRefreshingWeather(true);
     try {
       const snapshot = await fetchWeather(city);
+      if (requestId !== weatherRequest.current) return;
       commit((previous) => ({
         city,
         actualWeather: snapshot,
         weather: previous.weatherMode === 'manual' ? previous.weather : snapshot.preset,
       }), false);
     } catch (error) {
+      if (requestId !== weatherRequest.current) return;
       console.warn('[roomforone] Live weather refresh failed; preserving the last successful snapshot.', error);
       setNotice('Live weather is temporarily unavailable. Your saved room conditions are unchanged.');
     } finally {
-      setIsRefreshingWeather(false);
+      if (requestId === weatherRequest.current) setIsRefreshingWeather(false);
     }
   }, [commit]);
 
@@ -65,11 +69,12 @@ export const App: React.FC = () => {
   const handleSelectCity = useCallback((city: CityConfig | null) => {
     setShowCityPicker(false);
     if (!city) {
+      weatherRequest.current++;
+      setIsRefreshingWeather(false);
       setNotice('Demo environment · choose a city whenever you want to sync live weather.');
       return;
     }
     commit({ city, weatherMode: 'live' });
-    void refreshWeather(city);
   }, [commit, refreshWeather]);
 
   useEffect(() => { audioEngine.update(roomState); }, [roomState.weather, roomState.windowOpen, roomState.audioTracks, roomState.masterVolume]);
