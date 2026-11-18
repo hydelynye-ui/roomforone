@@ -169,7 +169,7 @@ export const InfiniteCanvasModal: React.FC<Props> = ({ notes, onNotes, onClose }
       ctx.strokeStyle = 'rgba(52,49,46,.12)'; ctx.strokeRect(note.x, note.y, 176, 154);
       ctx.fillStyle = 'rgba(52,49,46,.42)'; ctx.font = '7px sans-serif'; ctx.fillText('NOTE', note.x + 12, note.y + 17);
       ctx.fillStyle = '#34312E'; ctx.font = '10px sans-serif';
-      const words = note.text.split(/\\s+/);
+      const words = note.text.split(/\s+/);
       let line = '', lineY = note.y + 39;
       for (const word of words) {
         const candidate = line ? line + ' ' + word : word;
