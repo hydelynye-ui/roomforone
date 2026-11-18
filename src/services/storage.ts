@@ -23,6 +23,7 @@ export const DEFAULT_ROOM_STATE: RoomState = {
   tangleNodes: initialTangle(),
   tangleNotes: [],
   gameHighScore: 0,
+  weatherMode: 'live',
 };
 
 const finite = (v: unknown, fallback: number, lo: number, hi: number) =>
@@ -47,7 +48,7 @@ export function normalizeRoomState(input: unknown): RoomState {
     : initialTangle();
   return {
     ...DEFAULT_ROOM_STATE, ...p,
-    weather: ['sunny', 'rain', 'snow', 'autumn', 'night'].includes(p.weather || '') ? p.weather! : 'sunny',
+    weather: ['sunny', 'cloudy', 'rain', 'snow', 'autumn', 'night'].includes(p.weather || '') ? p.weather! : 'sunny',
     windowOpen: typeof p.windowOpen === 'boolean' ? p.windowOpen : true,
     lampOn: typeof p.lampOn === 'boolean' ? p.lampOn : false,
     masterMute: true,
@@ -64,6 +65,14 @@ export function normalizeRoomState(input: unknown): RoomState {
     tangleNotes: Array.isArray(p.tangleNotes) ? p.tangleNotes.filter((n): n is TangleNote =>
       !!n && typeof n.id === 'string' && typeof n.text === 'string' && Number.isFinite(n.createdAt)) : [],
     gameHighScore: finite(p.gameHighScore, 0, 0, 1e7),
+    city: p.city && typeof p.city.id === 'string' && typeof p.city.name === 'string'
+      && typeof p.city.country === 'string' && typeof p.city.timezone === 'string'
+      && Number.isFinite(p.city.latitude) && Number.isFinite(p.city.longitude)
+      ? { ...p.city } : undefined,
+    weatherMode: p.weatherMode === 'manual' ? 'manual' : 'live',
+    actualWeather: p.actualWeather && typeof p.actualWeather === 'object'
+      && Number.isFinite(p.actualWeather.temperature) && Number.isFinite(p.actualWeather.weatherCode)
+      ? { ...p.actualWeather } : undefined,
   };
 }
 
