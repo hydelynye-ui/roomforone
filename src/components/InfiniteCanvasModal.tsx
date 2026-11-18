@@ -146,11 +146,44 @@ export const InfiniteCanvasModal: React.FC<Props> = ({ notes, onNotes, onClose }
     ctx.fillStyle = '#FAF7F0'; ctx.fillRect(0, 0, width, height); saveCanvas();
   };
   const exportCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const source = canvasRef.current;
+    const viewport = viewportRef.current;
+    if (!source || !viewport) return;
+    const rect = viewport.getBoundingClientRect();
+    const output = document.createElement('canvas');
+    output.width = Math.max(1, Math.round(rect.width));
+    output.height = Math.max(1, Math.round(rect.height));
+    const ctx = output.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = '#ECE9E0'; ctx.fillRect(0, 0, output.width, output.height);
+    const centerX = output.width / 2 + offset.x;
+    const centerY = output.height / 2 + offset.y;
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.scale(zoom, zoom);
+    ctx.drawImage(source, -width / 2, -height / 2, width, height);
+    const toneColors: Record<CanvasNote['tone'], string> = { sage: '#DCE5D8', clay: '#F0DDD1', cream: '#F0E7C9' };
+    for (const note of notesRef.current) {
+      ctx.fillStyle = toneColors[note.tone];
+      ctx.fillRect(note.x, note.y, 176, 154);
+      ctx.strokeStyle = 'rgba(52,49,46,.12)'; ctx.strokeRect(note.x, note.y, 176, 154);
+      ctx.fillStyle = 'rgba(52,49,46,.42)'; ctx.font = '7px sans-serif'; ctx.fillText('NOTE', note.x + 12, note.y + 17);
+      ctx.fillStyle = '#34312E'; ctx.font = '10px sans-serif';
+      const words = note.text.split(/\\s+/);
+      let line = '', lineY = note.y + 39;
+      for (const word of words) {
+        const candidate = line ? line + ' ' + word : word;
+        if (ctx.measureText(candidate).width > 150 && line) {
+          ctx.fillText(line, note.x + 12, lineY); lineY += 15; line = word;
+          if (lineY > note.y + 140) break;
+        } else line = candidate;
+      }
+      if (line && lineY <= note.y + 140) ctx.fillText(line, note.x + 12, lineY);
+    }
+    ctx.restore();
     const link = document.createElement('a');
     link.download = `roomforone-canvas-${Date.now()}.png`;
-    link.href = canvas.toDataURL('image/png');
+    link.href = output.toDataURL('image/png');
     document.body.appendChild(link); link.click(); link.remove();
   };
 
