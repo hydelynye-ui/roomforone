@@ -489,3 +489,5 @@ body { overflow: hidden; font-family: 'Plus Jakarta Sans', Inter, ui-sans-serif,
 .computer-track-toggle { width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid rgba(137,119,94,.14); border-radius: 50%; background: rgba(255,255,255,.72); color: #718c70; }
 .computer-track-toggle:hover { background: #dce5d8; }
 @media (max-width: 767px) { .computer-track { grid-template-columns: 7px minmax(62px,1fr) 24px minmax(65px,1.2fr) auto; } }
+
+.live-indicator.is-manual { background: #c9a47e; box-shadow: 0 0 0 3px rgba(201,164,126,.15); }
