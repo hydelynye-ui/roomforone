@@ -1,8 +1,6 @@
 import React, { lazy, Suspense, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Room3D } from './components/Room3D';
 import { TopBar } from './components/TopBar';
-import { BentoCards } from './components/BentoCards';
-import { FloatingDock } from './components/FloatingDock';
 import type { AudioTrack, CityConfig, ModalType, MoodAIRecommendation, ObjectId, ObjectPose, RoomState, TangleNote, Vec3, WeatherPreset } from './types';
 import { loadRoomState, saveRoomState } from './services/storage';
 import { audioEngine } from './services/audioEngine';
@@ -43,7 +41,7 @@ export const App: React.FC = () => {
     const previous = stateRef.current;
     const next = { ...previous, ...(typeof patch === 'function' ? patch(previous) : patch) };
     stateRef.current = next; setRoomState(next);
-    if (!saveRoomState(next)) setNotice('当前设备无法保存，请先导出重要画稿。');
+    if (!saveRoomState(next)) setNotice('This device could not save your changes. Please export important canvas work.');
     if (manual) { revision.current++; setSceneRevision(revision.current); }
   }, []);
   const refreshWeather = useCallback(async (city: CityConfig) => {
@@ -95,7 +93,7 @@ export const App: React.FC = () => {
     try {
       const muted = await audioEngine.setMute(!stateRef.current.masterMute);
       commit({ masterMute: muted });
-    } catch (error) { setNotice(error instanceof Error ? error.message : '声音暂时无法播放'); }
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Audio is temporarily unavailable.'); }
     finally { soundPending.current = false; }
   }, [commit]);
   const setWeather = useCallback((weather: WeatherPreset) => commit({ weather, weatherMode: 'manual' }), [commit]);
@@ -110,7 +108,7 @@ export const App: React.FC = () => {
   const updateRotation = useCallback((roomRotation: number) => commit({ roomRotation }, false), [commit]);
   const close = useCallback(() => setActiveModal(null), []);
   const applyMood = useCallback((rec: MoodAIRecommendation, expectedRevision: number) => {
-    if (revision.current !== expectedRevision) { setNotice('房间刚刚有手动调整，请重新生成建议后再应用。'); return; }
+    if (revision.current !== expectedRevision) { setNotice('The room has changed. Generate a new suggestion before applying it.'); return; }
     commit(s => ({ weather: rec.weather, weatherMode: 'manual', lampOn: rec.lampOn, stickyNote: rec.roomNote,
       volumeWeather: rec.volumeWeather, volumeAmbient: rec.volumeAmbient,
       audioTracks: { ...s.audioTracks, rain: rec.volumeWeather, wind: rec.volumeWeather * 0.65, birds: rec.volumeAmbient, lofi: rec.volumeAmbient * 0.4 },
@@ -155,11 +153,9 @@ export const App: React.FC = () => {
     /></div>
     <main className="workspace" inert={!!activeModal}>
       <Room3D state={roomState} timeOfDay={timeOfDay} blocked={!!activeModal} editTarget={editTarget} onEditEnd={() => setEditTarget(null)} onSelectModal={setActiveModal} onToggleWindow={toggleWindow} onToggleLamp={toggleLamp} onPose={updatePose} onTangle={updateNodes} onRotation={updateRotation} />
-      {!zenMode && <BentoCards stickyNote={roomState.stickyNote} onOpenModal={setActiveModal} onOpenMoodAI={() => setActiveModal('mood-ai')} />}
     </main>
-    {!zenMode && <div inert={!!activeModal}><FloatingDock activeModal={activeModal} onSelectModal={setActiveModal} /></div>}
     {showCityPicker && <CityPicker onSelect={handleSelectCity} />}
-    {notice && <div role="status" className="room-notice">{notice}<button aria-label="关闭提示" onClick={() => setNotice('')}>×</button></div>}
+    {notice && <div role="status" className="room-notice">{notice}<button aria-label="Dismiss notice" onClick={() => setNotice('')}>×</button></div>}
     {activeModal && <div ref={modalRef} role="dialog" aria-modal="true" aria-label="房间内容面板" tabIndex={-1} data-modal-host>
       <Suspense fallback={<div className="modal-loading">正在打开…<button onClick={close}>返回房间</button></div>}>
         {activeModal === 'computer' && <ComputerModal onClose={close} />}
