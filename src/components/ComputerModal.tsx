@@ -151,7 +151,13 @@ export const ComputerModal: React.FC<ComputerModalProps> = ({
   };
 
   return (
-    <div className="computer-overlay" role="presentation" onClick={onClose}>
+    <div className="computer-overlay" role="presentation" onClick={onClose} onKeyDown={event => {
+      if (event.key !== 'Escape' || (event.target as HTMLElement).closest('textarea,input')) return;
+      event.stopPropagation();
+      if (showCanvas) { setShowCanvas(false); setActiveApp(null); }
+      else if (activeApp) setActiveApp(null);
+      else onClose();
+    }}>
       <section className="computer-shell" role="dialog" aria-modal="true" aria-label="roomforone desktop" onClick={event => event.stopPropagation()}>
         <header className="computer-menubar">
           <div className="computer-brand"><span className="computer-brand-mark" /> <strong>roomforone</strong></div>
