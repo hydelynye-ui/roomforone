@@ -188,7 +188,7 @@ export const InfiniteCanvasModal: React.FC<Props> = ({ notes, onNotes, onClose }
   };
 
   return (
-    <div className="infinite-canvas-overlay" onClick={event => event.stopPropagation()}>
+    <div className="infinite-canvas-overlay" onClick={event => event.stopPropagation()} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }}>
       <section className="infinite-canvas-shell" role="dialog" aria-modal="true" aria-label="Infinite Canvas">
         <header className="infinite-canvas-header">
           <div><span className="infinite-canvas-mark"><StickyNote size={16} /></span><div><strong>Infinite Canvas</strong><small>Draw, collect and connect ideas.</small></div></div>
