@@ -41,7 +41,7 @@ const appTitles: Record<AppId, string> = {
 };
 
 export const ComputerModal: React.FC<ComputerModalProps> = ({
-  onClose, roomState, onUpdateTrack, onMasterVolume, onToggleMute, onUpdateNotes, onUpdateMovies,
+  onClose, roomState, onUpdateTrack, onMasterVolume, onToggleMute, onUpdateNotes, onUpdateMovies, onUpdateCanvasNotes,
 }) => {
   const [activeApp, setActiveApp] = useState<AppId | null>(null);
   const [movieTitle, setMovieTitle] = useState('');
