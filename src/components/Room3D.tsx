@@ -56,6 +56,7 @@ export const Room3D: React.FC<Props> = props => {
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-6, 6, 5, -5, 0.1, 100);
     let yaw = props.state.roomRotation, selected: ObjectId | null = null;
+    let intro = 0;
     let disposed = false;
     let phase: InteractionPhase = 'idle';
     const target = new THREE.Vector3(0, 1.25, 0), desiredTarget = target.clone();
@@ -80,7 +81,7 @@ export const Room3D: React.FC<Props> = props => {
     const cylinder = (r: number, height: number, mat: THREE.Material, parent: THREE.Object3D, p: Vec3 = [0, 0, 0]) => mesh(new THREE.CylinderGeometry(r, r, height, 12), mat, parent, p);
     const sphereGeo = new THREE.SphereGeometry(0.06, 10, 8); geometries.add(sphereGeo);
     const group = (id: ObjectId) => {
-      const g = groups[id] = new THREE.Group(); g.userData = { id }; scene.add(g);
+      const g = groups[id] = new THREE.Group(); g.userData = { id, floatSeed: Object.keys(groups).length * 1.7 }; scene.add(g);
       g.position.set(...poses[id].position); g.rotation.y = poses[id].rotation; return g;
     };
     const register = (g: THREE.Object3D, id: string) => { g.userData.id = id; clickables.push(g); };
@@ -428,13 +429,20 @@ export const Room3D: React.FC<Props> = props => {
       if (wasBlocked && !live.current.blocked) { selected = null; transition(null, 'idle'); resetFocus(); }
       wasBlocked = live.current.blocked;
       if (s.tangleNodes !== previousNodes && !gesture) { previousNodes = s.tangleNodes; nodes = s.tangleNodes.map(p => [...p] as Vec3); drawTangle(); }
-      target.lerp(desiredTarget, alpha); zoom += (desiredZoom - zoom) * alpha; camera.zoom = zoom; camera.updateProjectionMatrix();
-      camera.position.set(target.x + Math.sin(yaw) * 16, target.y + 11.2, target.z + Math.cos(yaw) * 16); camera.lookAt(target);
+      intro = Math.min(1, intro + dt * 0.62);
+      const introEase = 1 - Math.pow(1 - intro, 3);
+      const introYaw = yaw + (1 - introEase) * 0.16;
+      const introZoom = zoom * (0.88 + introEase * 0.12);
+      target.lerp(desiredTarget, alpha); zoom += (desiredZoom - zoom) * alpha; camera.zoom = introZoom; camera.updateProjectionMatrix();
+      camera.position.set(target.x + Math.sin(introYaw) * 16, target.y + 11.2, target.z + Math.cos(introYaw) * 16); camera.lookAt(target);
       for (const id of Object.keys(groups) as ObjectId[]) {
         const g = groups[id]; const lifted = selected === id && (phase === 'picked' || phase === 'manipulating' || (live.current.blocked && (id === 'headphones' || id === 'game')));
-        const destination = new THREE.Vector3(...poses[id].position); destination.y += lifted ? 0.16 : 0;
+        const hovered = interaction.id === id && phase === 'hover';
+        const destination = new THREE.Vector3(...poses[id].position);
+        const idleFloat = (!selected && !live.current.blocked && id !== 'computer') ? Math.sin(milliseconds / 2400 + Number(g.userData.floatSeed ?? 0)) * 0.012 : 0;
+        destination.y += (lifted ? 0.16 : 0) + idleFloat;
         g.position.lerp(destination, alpha); g.rotation.y = poses[id].rotation;
-        const scale = lifted ? 1.025 : 1; g.scale.lerp(new THREE.Vector3(scale, scale, scale), alpha);
+        const scale = lifted ? 1.025 : hovered ? 1.018 : 1; g.scale.lerp(new THREE.Vector3(scale, scale, scale), alpha);
       }
       const hour = live.current.timeOfDay;
       const isNight = s.weather === 'night' || hour < 5.5 || hour >= 20;
@@ -515,13 +523,12 @@ export const Room3D: React.FC<Props> = props => {
     <div ref={containerRef} className="room-canvas" />
     {simple && <span className="simple-label">Simplified rendering · interactions remain available</span>}
     {failed ? <div className="room-fallback"><h2>Explore another way</h2><p>3D rendering is unavailable in this browser. You can still open the computer, canvas, audio and other room tools.</p>{(['computer', 'drawing', 'headphones', 'switch'] as ModalType[]).map(id => <button key={id} className="soft-button" onClick={() => props.onSelectModal(id)}>{id === 'drawing' ? 'Drawing Board' : id === 'switch' ? 'Switch Controller' : names[id as ObjectId]}</button>)}</div> : <>
-      {guide && <div className="room-guide"><span className="eyebrow">MAKE YOURSELF AT HOME</span><h2>A little space to slow down.</h2><p>Drag the open space to look around. Select an object to explore.</p><button onClick={() => setGuide(false)} aria-label="Dismiss welcome message">×</button></div>}
-      <div className="room-bottom-bar"><span>{interaction.id ? names[interaction.id] + ' · ' + phases[interaction.phase] : 'Drag to explore · Pinch to look around'}</span><button onClick={() => { handle.current?.resetView(); setGuide(true); }}>Reset view</button></div>
-      <div className="object-toolbar">
-        <label className="sr-only" htmlFor="object-picker">Choose an object to explore</label>
-        <select id="object-picker" value={interaction.id || ''} onChange={e => handle.current?.select(e.target.value as ObjectId)}><option value="" disabled>Explore an object</option>{Object.entries(names).filter(([id]) => id !== 'tools').map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
-        {interaction.id && <><button className={rotateMode ? 'active' : ''} aria-pressed={rotateMode} onClick={() => setRotateMode(!rotateMode)}>{rotateMode ? 'Rotate' : 'Move'}</button><button onClick={() => handle.current?.rotate(0.26)} aria-label="Rotate selected object by fifteen degrees">↻</button><button onClick={() => handle.current?.reset()}>Reset object</button><button onClick={() => handle.current?.resetView()} aria-label="Exit object editing">×</button></>}
-      </div>
+      {guide && <div className="room-guide"><span className="eyebrow">ROOMFORONE</span><p>Move through the room. Everything is a little closer than it looks.</p><button onClick={() => setGuide(false)} aria-label="Dismiss welcome message">×</button></div>}
+      <div className="room-bottom-bar"><span>{interaction.id ? names[interaction.id] + ' · ' + phases[interaction.phase] : 'Drag to explore'}</span><button onClick={() => { handle.current?.resetView(); setGuide(true); }}>Reset</button></div>
+      {interaction.id && <div className="object-toolbar" aria-label="Selected object controls">
+        <span className="object-toolbar-name">{names[interaction.id]}</span>
+        <button className={rotateMode ? 'active' : ''} aria-pressed={rotateMode} onClick={() => setRotateMode(!rotateMode)}>{rotateMode ? 'Rotate' : 'Move'}</button><button onClick={() => handle.current?.rotate(0.26)} aria-label="Rotate selected object">↻</button><button onClick={() => handle.current?.reset()}>Reset</button><button onClick={() => handle.current?.resetView()} aria-label="Exit object editing">×</button>
+      </div>}
       {interaction.id === 'tangle' && <div className="tangle-edit-tip">Tangle · Drag any link to reshape it<button onClick={() => handle.current?.resetView()}>Done</button></div>}
     </>}
   </section>;
