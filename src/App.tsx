@@ -1,7 +1,7 @@
 import React, { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { Room3D } from './components/Room3D';
 import { TopBar } from './components/TopBar';
-import type { AudioTrack, CityConfig, ModalType, MoodAIRecommendation, MovieEntry, ObjectId, ObjectPose, RoomState, Vec3, WeatherPreset } from './types';
+import type { AudioTrack, CanvasNote, CityConfig, ModalType, MoodAIRecommendation, MovieEntry, ObjectId, ObjectPose, RoomState, Vec3, WeatherPreset } from './types';
 import { loadRoomState, saveRoomState } from './services/storage';
 import { audioEngine } from './services/audioEngine';
 import { CityPicker } from './components/CityPicker';
@@ -104,6 +104,7 @@ export const App: React.FC = () => {
   const updateTrack = useCallback((track: AudioTrack, value: number) => commit(s => ({ audioTracks: { ...s.audioTracks, [track]: value } })), [commit]);
   const updateNotes = useCallback((notesText: string) => commit({ notesText }, false), [commit]);
   const updateMovies = useCallback((movieEntries: MovieEntry[]) => commit({ movieEntries }, false), [commit]);
+  const updateCanvasNotes = useCallback((canvasNotes: CanvasNote[]) => commit({ canvasNotes }, false), [commit]);
   const updatePose = useCallback((id: ObjectId, pose: ObjectPose) => commit(s => ({ objectPoses: { ...s.objectPoses, [id]: pose } }), false), [commit]);
   const updateNodes = useCallback((nodes: Vec3[]) => commit({ tangleNodes: nodes }, false), [commit]);
   const updateRotation = useCallback((roomRotation: number) => commit({ roomRotation }, false), [commit]);
@@ -159,7 +160,7 @@ export const App: React.FC = () => {
     {notice && <div role="status" className="room-notice">{notice}<button aria-label="Dismiss notice" onClick={() => setNotice('')}>×</button></div>}
     {activeModal && <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Room content panel" tabIndex={-1} data-modal-host>
       <Suspense fallback={<div className="modal-loading">Opening…<button onClick={close}>Return to room</button></div>}>
-        {activeModal === 'computer' && <ComputerModal onClose={close} roomState={roomState} onUpdateTrack={updateTrack} onMasterVolume={masterVolume => commit({ masterVolume }, false)} onToggleMute={toggleMute} onUpdateNotes={updateNotes} onUpdateMovies={updateMovies} />}
+        {activeModal === 'computer' && <ComputerModal onClose={close} roomState={roomState} onUpdateTrack={updateTrack} onMasterVolume={masterVolume => commit({ masterVolume }, false)} onToggleMute={toggleMute} onUpdateNotes={updateNotes} onUpdateMovies={updateMovies} onUpdateCanvasNotes={updateCanvasNotes} />}
         {activeModal === 'drawing' && <DrawingModal onClose={close} />}
         {activeModal === 'switch' && <SwitchPanel onClose={close} />}
         {activeModal === 'diy' && <DIYModal onClose={close} />}
