@@ -1,46 +1,81 @@
-# AGENTS.md — roomforone 自动化与 AI Agent 协作工程规范
+# AGENTS.md — roomforone implementation rules
 
-本规范适用于所有针对本仓库进行代码维护、特性迭代、缺陷修复或自动化构建的 AI Agent（包括 Codex、Claude Code、Cursor、Gemini CLI 等）。
+These instructions apply to every agent working in this repository.
 
----
+## Product boundary
 
-## 一、修改前的基线检查
+This repository is only for **roomforone**. Do not import requirements, components, storage keys, assets, credentials or deployment settings from unrelated projects.
 
-1. **项目结构感知**：修改任何文件前，必须先完整读取当前项目目录结构与依赖清单，严禁凭经验假设文件位置。
-2. **环境隔离意识**：本项目绑定专属 CloudBase 环境 `applicable-butterfly-d9ac7eb21be`（地域 `ap-shanghai`，根路径 `/`）。
-   - **绝对禁止**将本项目部署到已有的 Focus Space 生产环境（`focus-space-d5gmg1bimc422765f`）。
-   - **绝对禁止**将 Focus Space 的代码、资源、数据库 Schema、环境变量或云函数混入本项目。
+roomforone is a quiet, interactive 3D personal space. The current approved direction is an incremental implementation inspired by the spatial storytelling and interaction language of Henry Heffernan, expressed through roomforone's own design system. Do not copy Henry's source code, assets or branding.
 
----
+## Non-negotiable product requirements
 
-## 二、代码与 UI/UX 维护规范
+- The room is an **open architectural set**. Do not add enclosing walls, a ceiling, or a human character.
+- Do not create or reintroduce people, avatars, character models, character animation, daily character routines or character state machines.
+- The large window belongs on the **right side** of the scene. Preserve a clear view through it.
+- Keep the scene full-viewport and spatially composed. Avoid default sidebars, card dashboards, unnecessary navigation bars and dense text overlays.
+- Use simple low-poly geometry, matte paper/cardboard/wood/fabric/plastic materials, restrained detail, soft directional light, contact shadows and carefully controlled contrast. Do not use photorealistic rendering or a full-screen pixelation filter.
+- The scene, desk objects, window, outdoor environment and UI must share one coherent visual language.
+- Visible product UI must be English.
+- City selection is visitor-controlled. Never request precise location automatically.
+- Local time must use the selected city's IANA time zone. Time of day and weather are separate inputs: morning, midday, golden hour and night are driven by local time; clear, cloudy, rain, snow and wind are weather conditions.
+- Live weather and local time must affect the 3D sky, light, weather particles and room atmosphere. Keep graceful fallbacks when external weather services are unavailable.
+- Do not add a person to make the room feel alive. The environment itself, light, weather and object interactions provide the experience.
 
-1. **保留原有 UI 与交互设计**：
-   - 保持低多边形开放剖面 3D 房间的整体美学基调（奶油白、浅木色、深暖灰、鼠尾草绿与陶土橙）。
-   - 保持 3D 视角环绕角度限制（100°~140° 安全观察区间，防止视角穿墙）。
-   - 保持已有核心交互：电脑作品集 Bento、画板涂鸦、接落叶小游戏、手作洞洞板、天气声音联动。
-2. **优先增量修改**：
-   - 不重写未受影响的模块。
-   - 严禁为了代码“重构风格”而破坏现有的成熟组件架构。
-3. **数据结构与持久化保护**：
-   - 不随意变更 `RoomState`、`ModalType` 等核心 TypeScript 接口定义。
-   - **绝对严禁**清除、覆写或重命名用户的本地持久化缓存：
-     - `localStorage` Key 必须为 `roomforone-state-v1`。
-     - `IndexedDB` 库名必须为 `roomforone-local-v1`。
-     - 不得注册破坏性的根路径 Service Worker。
+## Computer desktop
 
----
+The computer is the primary software entrance. It should use a camera approach transition and open a coherent desktop environment with exactly these four core apps:
 
-## 三、安全与环境安全规范（零容忍）
+1. **Notes** — editable and automatically saved.
+2. **Music** — four independent tracks (rain, wind, birds, original generated lo-fi), per-track play/pause and volume, master volume and mute.
+3. **Infinite Canvas** — drawing, pan, zoom, export and draggable sticky notes.
+4. **Movie Book** — add, review and remove film records with an optional year and personal note.
 
-1. **凭证与密钥防泄漏**：
-   - **严禁**将任何 `SecretId`、`SecretKey`、API Key、Token、私钥或凭据提交至 Git 仓库。
-   - `.env.local` 必须严格保持在 `.gitignore` 中。
-   - `.env.example` 中仅保留公开环境变量名与环境 ID，值必须脱敏或留空。
-2. **生产部署审批防线**：
-   - **未经用户明确确认，严禁擅自执行云端正式发布命令**（如 `tcb deploy`、`tcb hosting deploy`）。
-   - 任何部署前，必须严格先执行 `tcb validate` 与 `tcb deploy --dry-run` 审查资源变动。
-   - 若 dry-run 显示部署路径不为 `/`，或涉及外部项目，必须立即终止。
-3. **Git 协作纪律**：
-   - 严禁执行 `git reset --hard` 或 `git push --force`。
-   - 保持清晰规范的 Commit Message。
+Do not replace these apps with a portfolio, project showcase, Bento dashboard or unrelated productivity suite. Each app must perform its stated action; visual placeholders are not accepted.
+
+## Physical object interactions
+
+- Tangle: selecting it moves the camera closer; links can be dragged and deformed while preserving link constraints.
+- AirPods Max: controls the shared room audio engine.
+- Switch controller: each visible control responds with pressed feedback. Do not launch the retired leaf-catching game.
+- Window and desk lamp: remain directly interactive and visibly change the scene.
+- Every interaction must support pointer and touch where applicable, with keyboard focus and visible focus styles for standard controls.
+
+## Engineering rules
+
+- Preserve the current Vite + React + TypeScript + Three.js architecture. Add a dependency only when it solves a concrete need.
+- Reuse the existing Three.js scene, camera, raycaster, audio engine and storage services. Do not create parallel engines for the same feature.
+- Preserve the existing storage identities:
+  - localStorage: `roomforone-state-v1`
+  - IndexedDB: `roomforone-local-v1`
+  - existing drawing store: `roomforone_drawings`
+- Extend and normalize data safely. Do not clear, rename or replace existing storage, and do not discard unknown fields when saving.
+- Audio must remain muted after reload and must only start after a direct visitor action.
+- Clean up animation frames, event listeners, pointer captures, observers and timers when components unmount.
+- Respect `prefers-reduced-motion`. Do not make core interactions depend on animation.
+- Avoid unverified external image URLs. Prefer procedural geometry and assets that are actually present in the repository.
+- Keep the project installable from the lockfile. Do not add local-only dependencies or secrets.
+
+## Required workflow
+
+Before changing code:
+1. Inspect the current branch, package scripts, source structure and relevant components.
+2. Identify the actual cause of a problem before changing code.
+3. Keep changes incremental and confined to roomforone.
+
+After changing code:
+1. Run `npm ci --include=optional`.
+2. Run `npm run typecheck`.
+3. Run `npm test`.
+4. Run `npm run build`.
+5. Start a local Vite preview and verify the desktop and mobile layouts, object interactions, computer app flows, persistence, city selection, live weather fallback and audio activation.
+6. Report exactly what was tested and what remains unverified. Never claim a build, browser test or deployment succeeded unless it actually did.
+
+## Deployment and Git boundaries
+
+- This task is local development and review only.
+- Do not run CloudBase, hosting, CDN, domain or production deployment commands.
+- Do not publish a preview to a public hosting service.
+- Do not merge this branch into `main` or `master`.
+- Never use force-push, destructive reset or commands that overwrite user data.
+- Never commit secrets, tokens, private keys or `.env.local`.
