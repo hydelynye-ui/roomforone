@@ -101,7 +101,7 @@ export const Room3D: React.FC<Props> = props => {
     } else box([3.3, 0.025, 2.65], material(0xDEDCCB), scene, [0.2, 0.02, 0.9]);
     for (let i = 0; i < (software ? 0 : 8); i++) box([0.012, 0.003, 2.55], paper, scene, [-1.2 + i * 0.4, 0.035, 0.9]).renderOrder = software ? -7 : 0;
 
-    const windowGroup = new THREE.Group(); windowGroup.position.set(3.12, 2.44, -0.2); windowGroup.rotation.y = -Math.PI / 2; scene.add(windowGroup);
+    const windowGroup = new THREE.Group(); windowGroup.position.set(3.12, 2.44, -0.2); windowGroup.rotation.y = Math.PI / 2; scene.add(windowGroup);
     for (const x of [-1.2, 0, 1.2]) box([0.09, 1.86, 0.13], wood, windowGroup, [x, 0, 0]);
     for (const y of [-0.92, 0.92]) box([2.48, 0.09, 0.13], wood, windowGroup, [0, y, 0]);
     box([2.7, 0.09, 0.4], darkWood, windowGroup, [0, -0.96, 0.08]);
@@ -119,7 +119,7 @@ export const Room3D: React.FC<Props> = props => {
         gl_FragColor=vec4(c,1.); }`,
     }); materials.add(skyMaterial);
     const simpleSky = material(0xBFDED5);
-    const skyPlane = mesh(new THREE.PlaneGeometry(2.42, 1.84), software ? simpleSky : skyMaterial, scene, [3.34, 2.44, -0.2]); skyPlane.rotation.y = -Math.PI / 2;
+    const skyPlane = mesh(new THREE.PlaneGeometry(2.42, 1.84), software ? simpleSky : skyMaterial, scene, [2.96, 2.44, -0.2]); skyPlane.rotation.y = Math.PI / 2;
     const rainGeometry = new THREE.BufferGeometry(); geometries.add(rainGeometry);
     const rainPoints = new Float32Array(60 * 3);
     for (let i = 0; i < 60; i++) { rainPoints[i * 3] = 3.02; rainPoints[i * 3 + 1] = 1.6 + Math.random() * 1.65; rainPoints[i * 3 + 2] = -1.3 + Math.random() * 2.2; }
