@@ -1,20 +1,20 @@
-import React, { lazy, Suspense, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { Room3D } from './components/Room3D';
 import { TopBar } from './components/TopBar';
-import type { AudioTrack, CityConfig, ModalType, MoodAIRecommendation, ObjectId, ObjectPose, RoomState, TangleNote, Vec3, WeatherPreset } from './types';
+import type { AudioTrack, CityConfig, ModalType, MoodAIRecommendation, MovieEntry, ObjectId, ObjectPose, RoomState, Vec3, WeatherPreset } from './types';
 import { loadRoomState, saveRoomState } from './services/storage';
 import { audioEngine } from './services/audioEngine';
 import { CityPicker } from './components/CityPicker';
 import { DEFAULT_CITY, fetchWeather, getLocalHour, getTimeLabel, getTimePhase } from './services/weatherService';
 const ComputerModal = lazy(() => import('./components/ComputerModal').then(m => ({ default: m.ComputerModal })));
 const DrawingModal = lazy(() => import('./components/DrawingModal').then(m => ({ default: m.DrawingModal })));
-const GameModal = lazy(() => import('./components/GameModal').then(m => ({ default: m.GameModal })));
 const DIYModal = lazy(() => import('./components/DIYModal').then(m => ({ default: m.DIYModal })));
 const AtmosphereModal = lazy(() => import('./components/AtmosphereModal').then(m => ({ default: m.AtmosphereModal })));
 const MoodAIModal = lazy(() => import('./components/MoodAIModal').then(m => ({ default: m.MoodAIModal })));
 const AboutModal = lazy(() => import('./components/AboutModal').then(m => ({ default: m.AboutModal })));
 const TangleModal = lazy(() => import('./components/TangleModal').then(m => ({ default: m.TangleModal })));
 const HeadphonesModal = lazy(() => import('./components/HeadphonesModal').then(m => ({ default: m.HeadphonesModal })));
+const SwitchPanel = lazy(() => import('./components/SwitchPanel').then(m => ({ default: m.SwitchPanel })));
 
 export const App: React.FC = () => {
   const [roomState, setRoomState] = useState<RoomState>(loadRoomState);
@@ -22,7 +22,6 @@ export const App: React.FC = () => {
   const [zenMode, setZenMode] = useState(false);
   const [editTarget, setEditTarget] = useState<ObjectId | null>(null);
   const [notice, setNotice] = useState('');
-  const [sceneRevision, setSceneRevision] = useState(0);
   const [showCityPicker, setShowCityPicker] = useState(() => !loadRoomState().city);
   const [now, setNow] = useState(() => new Date());
   const [isRefreshingWeather, setIsRefreshingWeather] = useState(false);
@@ -42,7 +41,7 @@ export const App: React.FC = () => {
     const next = { ...previous, ...(typeof patch === 'function' ? patch(previous) : patch) };
     stateRef.current = next; setRoomState(next);
     if (!saveRoomState(next)) setNotice('This device could not save your changes. Please export important canvas work.');
-    if (manual) { revision.current++; setSceneRevision(revision.current); }
+    if (manual) revision.current++;
   }, []);
   const refreshWeather = useCallback(async (city: CityConfig) => {
     setIsRefreshingWeather(true);
@@ -103,6 +102,8 @@ export const App: React.FC = () => {
     ? { volumeWeather: value, audioTracks: { ...s.audioTracks, rain: value, wind: value * 0.7 } }
     : { volumeAmbient: value, audioTracks: { ...s.audioTracks, birds: value, lofi: value * 0.4 } }), [commit]);
   const updateTrack = useCallback((track: AudioTrack, value: number) => commit(s => ({ audioTracks: { ...s.audioTracks, [track]: value } })), [commit]);
+  const updateNotes = useCallback((notesText: string) => commit({ notesText }, false), [commit]);
+  const updateMovies = useCallback((movieEntries: MovieEntry[]) => commit({ movieEntries }, false), [commit]);
   const updatePose = useCallback((id: ObjectId, pose: ObjectPose) => commit(s => ({ objectPoses: { ...s.objectPoses, [id]: pose } }), false), [commit]);
   const updateNodes = useCallback((nodes: Vec3[]) => commit({ tangleNodes: nodes }, false), [commit]);
   const updateRotation = useCallback((roomRotation: number) => commit({ roomRotation }, false), [commit]);
@@ -142,7 +143,7 @@ export const App: React.FC = () => {
       onSetWeather={setWeather}
       onUseLiveWeather={handleUseLiveWeather}
       onToggleMute={toggleMute}
-      onOpenMoodAI={() => setActiveModal('mood-ai')}
+      onOpenEnvironment={() => setActiveModal('atmosphere')}
       onOpenCityPicker={() => setShowCityPicker(true)}
       timeLabel={timeLabel}
       timePhase={timePhase}
@@ -156,11 +157,11 @@ export const App: React.FC = () => {
     </main>
     {showCityPicker && <CityPicker onSelect={handleSelectCity} />}
     {notice && <div role="status" className="room-notice">{notice}<button aria-label="Dismiss notice" onClick={() => setNotice('')}>×</button></div>}
-    {activeModal && <div ref={modalRef} role="dialog" aria-modal="true" aria-label="房间内容面板" tabIndex={-1} data-modal-host>
-      <Suspense fallback={<div className="modal-loading">正在打开…<button onClick={close}>返回房间</button></div>}>
-        {activeModal === 'computer' && <ComputerModal onClose={close} />}
+    {activeModal && <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Room content panel" tabIndex={-1} data-modal-host>
+      <Suspense fallback={<div className="modal-loading">Opening…<button onClick={close}>Return to room</button></div>}>
+        {activeModal === 'computer' && <ComputerModal onClose={close} roomState={roomState} onUpdateTrack={updateTrack} onMasterVolume={masterVolume => commit({ masterVolume }, false)} onToggleMute={toggleMute} onUpdateNotes={updateNotes} onUpdateMovies={updateMovies} />}
         {activeModal === 'drawing' && <DrawingModal onClose={close} />}
-        {activeModal === 'game' && <GameModal onClose={close} highScore={roomState.gameHighScore} onHighScore={gameHighScore => commit({ gameHighScore }, false)} />}
+        {activeModal === 'switch' && <SwitchPanel onClose={close} />}
         {activeModal === 'diy' && <DIYModal onClose={close} />}
         {activeModal === 'about' && <AboutModal onClose={close} />}
         {activeModal === 'tangle' && <TangleModal onClose={close} notes={roomState.tangleNotes} onNotes={tangleNotes => commit({ tangleNotes }, false)} onEdit={() => { setEditTarget('tangle'); close(); }} />}
