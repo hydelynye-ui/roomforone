@@ -107,13 +107,13 @@ export const InfiniteCanvasModal: React.FC<Props> = ({ notes, onNotes, onClose }
     const next = notesRef.current.filter(note => note.id !== id);
     notesRef.current = next; setDraftNotes(next); onNotes(next);
   };
-  const startNoteDrag = (event: React.PointerEvent<HTMLDivElement>, note: CanvasNote) => {
+  const startNoteDrag = (event: React.PointerEvent<HTMLElement>, note: CanvasNote) => {
     if ((event.target as HTMLElement).closest('textarea,button')) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     noteDrag.current = { id: note.id, pointerId: event.pointerId, x: event.clientX, y: event.clientY, noteX: note.x, noteY: note.y };
   };
-  const moveNote = (event: React.PointerEvent<HTMLDivElement>) => {
+  const moveNote = (event: React.PointerEvent<HTMLElement>) => {
     const drag = noteDrag.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     const dx = (event.clientX - drag.x) / zoom;
@@ -121,22 +121,22 @@ export const InfiniteCanvasModal: React.FC<Props> = ({ notes, onNotes, onClose }
     const next = notesRef.current.map(note => note.id === drag.id ? { ...note, x: drag.noteX + dx, y: drag.noteY + dy } : note);
     notesRef.current = next; setDraftNotes(next);
   };
-  const endNoteDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+  const endNoteDrag = (event: React.PointerEvent<HTMLElement>) => {
     if (!noteDrag.current || noteDrag.current.pointerId !== event.pointerId) return;
     noteDrag.current = null;
     onNotes(notesRef.current);
   };
-  const startPan = (event: React.PointerEvent<HTMLDivElement>) => {
+  const startPan = (event: React.PointerEvent<HTMLElement>) => {
     if (event.target !== event.currentTarget) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     pan.current = { id: event.pointerId, x: event.clientX, y: event.clientY, offsetX: offset.x, offsetY: offset.y };
   };
-  const movePan = (event: React.PointerEvent<HTMLDivElement>) => {
+  const movePan = (event: React.PointerEvent<HTMLElement>) => {
     const active = pan.current;
     if (!active || active.id !== event.pointerId) return;
     setOffset({ x: active.offsetX + event.clientX - active.x, y: active.offsetY + event.clientY - active.y });
   };
-  const endPan = (event: React.PointerEvent<HTMLDivElement>) => {
+  const endPan = (event: React.PointerEvent<HTMLElement>) => {
     if (pan.current?.id === event.pointerId) pan.current = null;
   };
   const clearCanvas = () => {
