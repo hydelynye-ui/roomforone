@@ -1,18 +1,14 @@
 import React, { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { Room3D } from './components/Room3D';
 import { TopBar } from './components/TopBar';
-import type { AudioTrack, CanvasNote, CityConfig, ModalType, MoodAIRecommendation, MovieEntry, ObjectId, ObjectPose, RoomState, Vec3, WeatherPreset } from './types';
+import type { AudioTrack, CanvasNote, CityConfig, ModalType, MovieEntry, ObjectId, ObjectPose, RoomState, Vec3, WeatherPreset } from './types';
 import { loadRoomState, saveRoomState } from './services/storage';
 import { audioEngine } from './services/audioEngine';
 import { CityPicker } from './components/CityPicker';
 import { DEFAULT_CITY, fetchWeather, getLocalHour, getTimeLabel, getTimePhase } from './services/weatherService';
 const ComputerModal = lazy(() => import('./components/ComputerModal').then(m => ({ default: m.ComputerModal })));
 const DrawingModal = lazy(() => import('./components/DrawingModal').then(m => ({ default: m.DrawingModal })));
-const DIYModal = lazy(() => import('./components/DIYModal').then(m => ({ default: m.DIYModal })));
 const AtmosphereModal = lazy(() => import('./components/AtmosphereModal').then(m => ({ default: m.AtmosphereModal })));
-const MoodAIModal = lazy(() => import('./components/MoodAIModal').then(m => ({ default: m.MoodAIModal })));
-const AboutModal = lazy(() => import('./components/AboutModal').then(m => ({ default: m.AboutModal })));
-const TangleModal = lazy(() => import('./components/TangleModal').then(m => ({ default: m.TangleModal })));
 const HeadphonesModal = lazy(() => import('./components/HeadphonesModal').then(m => ({ default: m.HeadphonesModal })));
 const SwitchPanel = lazy(() => import('./components/SwitchPanel').then(m => ({ default: m.SwitchPanel })));
 
@@ -29,19 +25,18 @@ export const App: React.FC = () => {
   const timeLabel = roomState.city ? getTimeLabel(selectedCity, now) : '--:--';
   const timePhase = roomState.city ? getTimePhase(selectedCity, now) : 'Demo Environment';
   const timeOfDay = getLocalHour(selectedCity, now);
-  const revision = useRef(0), stateRef = useRef(roomState), modalRef = useRef<HTMLDivElement>(null);
+  const stateRef = useRef(roomState), modalRef = useRef<HTMLDivElement>(null);
   stateRef.current = roomState;
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(interval);
   }, []);
 
-  const commit = useCallback((patch: Partial<RoomState> | ((s: RoomState) => Partial<RoomState>), manual = true) => {
+  const commit = useCallback((patch: Partial<RoomState> | ((s: RoomState) => Partial<RoomState>), _manual = true) => {
     const previous = stateRef.current;
     const next = { ...previous, ...(typeof patch === 'function' ? patch(previous) : patch) };
     stateRef.current = next; setRoomState(next);
     if (!saveRoomState(next)) setNotice('This device could not save your changes. Please export important canvas work.');
-    if (manual) revision.current++;
   }, []);
   const refreshWeather = useCallback(async (city: CityConfig) => {
     setIsRefreshingWeather(true);
@@ -102,16 +97,6 @@ export const App: React.FC = () => {
   const updateNodes = useCallback((nodes: Vec3[]) => commit({ tangleNodes: nodes }, false), [commit]);
   const updateRotation = useCallback((roomRotation: number) => commit({ roomRotation }, false), [commit]);
   const close = useCallback(() => setActiveModal(null), []);
-  const applyMood = useCallback((rec: MoodAIRecommendation, expectedRevision: number) => {
-    if (revision.current !== expectedRevision) { setNotice('The room has changed. Generate a new suggestion before applying it.'); return; }
-    commit(s => ({ weather: rec.weather, weatherMode: 'manual', lampOn: rec.lampOn, stickyNote: rec.roomNote,
-      volumeWeather: rec.volumeWeather, volumeAmbient: rec.volumeAmbient,
-      audioTracks: { ...s.audioTracks, rain: rec.volumeWeather, wind: rec.volumeWeather * 0.65, birds: rec.volumeAmbient, lofi: rec.volumeAmbient * 0.4 },
-    }));
-    // Keep the user's explicit window and mute choices.
-    close();
-  }, [commit, close]);
-
   useEffect(() => {
     if (!activeModal) return;
     const opener = document.activeElement as HTMLElement | null;
@@ -154,12 +139,8 @@ export const App: React.FC = () => {
         {activeModal === 'computer' && <ComputerModal onClose={close} roomState={roomState} onUpdateTrack={updateTrack} onMasterVolume={masterVolume => commit({ masterVolume }, false)} onToggleMute={toggleMute} onUpdateNotes={updateNotes} onUpdateMovies={updateMovies} onUpdateCanvasNotes={updateCanvasNotes} />}
         {activeModal === 'drawing' && <DrawingModal onClose={close} />}
         {activeModal === 'switch' && <SwitchPanel onClose={close} />}
-        {activeModal === 'diy' && <DIYModal onClose={close} />}
-        {activeModal === 'about' && <AboutModal onClose={close} />}
-        {activeModal === 'tangle' && <TangleModal onClose={close} notes={roomState.tangleNotes} onNotes={tangleNotes => commit({ tangleNotes }, false)} onEdit={() => { setEditTarget('tangle'); close(); }} />}
         {activeModal === 'headphones' && <HeadphonesModal roomState={roomState} onToggleMute={toggleMute} onUpdateTrack={updateTrack} onMasterVolume={masterVolume => commit({ masterVolume })} onSetWeather={setWeather} onClose={close} />}
         {activeModal === 'atmosphere' && <AtmosphereModal roomState={roomState} onSetWeather={setWeather} onToggleWindow={toggleWindow} onToggleLamp={toggleLamp} onToggleMute={toggleMute} onUpdateVolume={updateLegacyVolume} onClose={close} />}
-        {activeModal === 'mood-ai' && <MoodAIModal sceneRevision={sceneRevision} onApplyRecommendation={applyMood} onClose={close} />}
       </Suspense>
     </div>}
   </div>;
