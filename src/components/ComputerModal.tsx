@@ -3,8 +3,8 @@ import {
   ArrowLeft, Clapperboard, Disc3, Film, Infinity, Music2, NotebookPen,
   Plus, Volume2, VolumeX, X, Minus, Trash2,
 } from 'lucide-react';
-import type { AudioTrack, MovieEntry, RoomState } from '../types';
-import { DrawingModal } from './DrawingModal';
+import type { AudioTrack, CanvasNote, MovieEntry, RoomState } from '../types';
+import { InfiniteCanvasModal } from './InfiniteCanvasModal';
 
 type AppId = 'notes' | 'music' | 'canvas' | 'movie-book';
 
@@ -16,6 +16,7 @@ interface ComputerModalProps {
   onToggleMute: () => void;
   onUpdateNotes: (value: string) => void;
   onUpdateMovies: (entries: MovieEntry[]) => void;
+  onUpdateCanvasNotes: (notes: CanvasNote[]) => void;
 }
 
 const apps: { id: AppId; name: string; description: string; icon: React.ReactNode; tone: string }[] = [
@@ -189,7 +190,7 @@ export const ComputerModal: React.FC<ComputerModalProps> = ({
           </nav>
         </div>
       </section>
-      {showCanvas && <DrawingModal onClose={() => { setShowCanvas(false); setActiveApp(null); }} />}
+      {showCanvas && <InfiniteCanvasModal notes={roomState.canvasNotes} onNotes={onUpdateCanvasNotes} onClose={() => { setShowCanvas(false); setActiveApp(null); }} />}
     </div>
   );
 };
