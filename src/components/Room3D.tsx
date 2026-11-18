@@ -333,7 +333,7 @@ export const Room3D: React.FC<Props> = props => {
       }
       if (id === 'window') { live.current.onToggleWindow(); return; }
       if (id === 'lamp') { live.current.onToggleLamp(); return; }
-      const modal: Record<string, ModalType> = { keyboard: 'computer', mouse: 'computer', tangle: 'tangle', headphones: 'headphones', game: 'switch', tools: 'diy', drawing: 'drawing', diy: 'diy', atmosphere: 'headphones', 'mood-ai': 'mood-ai' };
+      const modal: Record<string, ModalType> = { headphones: 'headphones', game: 'switch', tools: 'diy', drawing: 'drawing', diy: 'diy', atmosphere: 'headphones', 'mood-ai': 'computer' };
       live.current.onSelectModal(modal[id] || null);
     };
     const onUp = (e: PointerEvent) => {
@@ -441,14 +441,14 @@ export const Room3D: React.FC<Props> = props => {
     };
   }, []);
 
-  return <section className="room-stage" aria-label="互动房间">
+  return <section className="room-stage" aria-label="Open 3D room">
     <div ref={containerRef} className="room-canvas" />
     {simple && <span className="simple-label">Simplified rendering · interactions remain available</span>}
     {failed ? <div className="room-fallback"><h2>Explore another way</h2><p>3D rendering is unavailable in this browser. You can still open the computer, canvas, audio and other room tools.</p>{(['computer', 'drawing', 'tangle', 'headphones', 'game', 'diy'] as ModalType[]).map(id => <button key={id} className="soft-button" onClick={() => props.onSelectModal(id)}>{id === 'drawing' ? 'Canvas' : id === 'diy' ? 'DIY' : names[id as ObjectId]}</button>)}</div> : <>
-      {guide && <div className="room-guide"><span className="eyebrow">MAKE YOURSELF AT HOME</span><h2>慢一点，也没关系。</h2><p>Drag the open space to look around. Select an object to explore.</p><button onClick={() => setGuide(false)} aria-label="Dismiss welcome message">×</button></div>}
+      {guide && <div className="room-guide"><span className="eyebrow">MAKE YOURSELF AT HOME</span><h2>A little space to slow down.</h2><p>Drag the open space to look around. Select an object to explore.</p><button onClick={() => setGuide(false)} aria-label="Dismiss welcome message">×</button></div>}
       <div className="room-bottom-bar"><span>{interaction.id ? names[interaction.id] + ' · ' + phases[interaction.phase] : 'Drag to explore · Pinch to look around'}</span><button onClick={() => { handle.current?.resetView(); setGuide(true); }}>Reset view</button></div>
       <div className="object-toolbar">
-        <label className="sr-only" htmlFor="object-picker">选择要操作的物件</label>
+        <label className="sr-only" htmlFor="object-picker">Choose an object to explore</label>
         <select id="object-picker" value={interaction.id || ''} onChange={e => handle.current?.select(e.target.value as ObjectId)}><option value="" disabled>Explore an object</option>{Object.entries(names).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
         {interaction.id && <><button className={rotateMode ? 'active' : ''} aria-pressed={rotateMode} onClick={() => setRotateMode(!rotateMode)}>{rotateMode ? 'Rotate' : 'Move'}</button><button onClick={() => handle.current?.rotate(0.26)} aria-label="Rotate selected object by fifteen degrees">↻</button><button onClick={() => handle.current?.reset()}>Reset object</button><button onClick={() => handle.current?.resetView()} aria-label="Exit object editing">×</button></>}
       </div>
