@@ -320,6 +320,7 @@ export const Room3D: React.FC<Props> = props => {
       } else if (!g.hit && e.pointerType !== 'touch') { yaw = clamp(yaw + dx * 0.006, -0.26, 1.83); }
     };
     const open = (id: string) => {
+      if (id === 'tangle') { handle.current?.select('tangle'); return; }
       if (id === 'keyboard' || id === 'mouse') { open('computer'); return; }
       if (id === 'computer') {
         if (enteringComputer) return;
