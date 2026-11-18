@@ -157,12 +157,11 @@ export const Room3D: React.FC<Props> = props => {
     const drawingMark = mesh(new THREE.TorusGeometry(0.24, 0.025, 4, 24, Math.PI * 1.5), terracotta, easel, [0.04, 1.45, 0.075]); drawingMark.rotation.z = 0.5;
     register(easel, 'drawing');
     box([0.45, 1, 1.65], darkWood, scene, [-2.7, 0.5, 1.1]);
-    const pegboard = box([0.08, 1.25, 1.7], wood, scene, [-3.05, 1.92, 1.1]); register(pegboard, 'diy');
+    const pegboard = box([0.08, 1.25, 1.7], wood, scene, [-3.05, 1.92, 1.1]);
     for (let row = 0; row < 5; row++) for (let col = 0; col < 7; col++) box([0.012, 0.025, 0.025], darkWood, scene, [-3, 1.43 + row * 0.24, 0.4 + col * 0.23]);
-    register(scene.children[scene.children.length - 1], 'diy');
     const tools = group('tools');
     box([0.08, 0.04, 0.38], terracotta, tools); box([0.28, 0.06, 0.09], graphite, tools, [0, 0.045, -0.14]);
-    box([0.11, 0.03, 0.33], paper, tools, [0.06, 0.03, 0.19]); register(tools, 'tools');
+    box([0.11, 0.03, 0.33], paper, tools, [0.06, 0.03, 0.19]);
 
     const computer = group('computer');
     box([0.44, 0.04, 0.28], silver, computer); box([0.065, 0.3, 0.065], silver, computer, [0, 0.16, 0]);
@@ -222,7 +221,7 @@ export const Room3D: React.FC<Props> = props => {
     drawTangle(); register(tangle, 'tangle');
 
     // The open space stays uncluttered; personal content lives inside the computer apps.
-    const sticky = box([0.32, 0.005, 0.27], material(0xEAD4A5), scene, [-1.8, 1.272, -1.48]); sticky.rotation.y = -0.2; register(sticky, 'mood-ai');
+    const sticky = box([0.32, 0.005, 0.27], material(0xEAD4A5), scene, [-1.8, 1.272, -1.48]); sticky.rotation.y = -0.2;
 
     const transition = (id: ObjectId | null, next: InteractionPhase) => { phase = next; setInteraction({ id, phase: next }); };
     const commit = (id: ObjectId) => live.current.onPose(id, structuredClone(poses[id]));
@@ -247,7 +246,7 @@ export const Room3D: React.FC<Props> = props => {
         // Screen-space fallback provides a 44px touch target without making visible props oversized.
         const rect = renderer.domElement.getBoundingClientRect();
         const candidates: { id: ObjectId; node?: number; point: THREE.Vector3; distance: number }[] = [];
-        for (const id of Object.keys(groups) as ObjectId[]) {
+        for (const id of (Object.keys(groups) as ObjectId[]).filter(id => id !== 'tools')) {
           const center = groups[id].getWorldPosition(new THREE.Vector3());
           if (id === 'computer') center.y += 0.4;
           if (id === 'headphones') center.y += 0.4;
@@ -321,6 +320,7 @@ export const Room3D: React.FC<Props> = props => {
     };
     const open = (id: string) => {
       if (id === 'tangle') { handle.current?.select('tangle'); return; }
+      if (id === 'mood-ai') { open('computer'); return; }
       if (id === 'keyboard' || id === 'mouse') { open('computer'); return; }
       if (id === 'computer') {
         if (enteringComputer) return;
@@ -333,7 +333,7 @@ export const Room3D: React.FC<Props> = props => {
       }
       if (id === 'window') { live.current.onToggleWindow(); return; }
       if (id === 'lamp') { live.current.onToggleLamp(); return; }
-      const modal: Record<string, ModalType> = { headphones: 'headphones', game: 'switch', tools: 'diy', drawing: 'drawing', diy: 'diy', atmosphere: 'headphones', 'mood-ai': 'computer' };
+      const modal: Record<string, ModalType> = { headphones: 'headphones', game: 'switch', drawing: 'drawing', atmosphere: 'headphones' };
       live.current.onSelectModal(modal[id] || null);
     };
     const onUp = (e: PointerEvent) => {
@@ -444,12 +444,12 @@ export const Room3D: React.FC<Props> = props => {
   return <section className="room-stage" aria-label="Open 3D room">
     <div ref={containerRef} className="room-canvas" />
     {simple && <span className="simple-label">Simplified rendering · interactions remain available</span>}
-    {failed ? <div className="room-fallback"><h2>Explore another way</h2><p>3D rendering is unavailable in this browser. You can still open the computer, canvas, audio and other room tools.</p>{(['computer', 'drawing', 'tangle', 'headphones', 'game', 'diy'] as ModalType[]).map(id => <button key={id} className="soft-button" onClick={() => props.onSelectModal(id)}>{id === 'drawing' ? 'Canvas' : id === 'diy' ? 'DIY' : names[id as ObjectId]}</button>)}</div> : <>
+    {failed ? <div className="room-fallback"><h2>Explore another way</h2><p>3D rendering is unavailable in this browser. You can still open the computer, canvas, audio and other room tools.</p>{(['computer', 'drawing', 'tangle', 'headphones', 'switch'] as ModalType[]).map(id => <button key={id} className="soft-button" onClick={() => props.onSelectModal(id)}>{id === 'drawing' ? 'Canvas' : id === 'diy' ? 'DIY' : names[id as ObjectId]}</button>)}</div> : <>
       {guide && <div className="room-guide"><span className="eyebrow">MAKE YOURSELF AT HOME</span><h2>A little space to slow down.</h2><p>Drag the open space to look around. Select an object to explore.</p><button onClick={() => setGuide(false)} aria-label="Dismiss welcome message">×</button></div>}
       <div className="room-bottom-bar"><span>{interaction.id ? names[interaction.id] + ' · ' + phases[interaction.phase] : 'Drag to explore · Pinch to look around'}</span><button onClick={() => { handle.current?.resetView(); setGuide(true); }}>Reset view</button></div>
       <div className="object-toolbar">
         <label className="sr-only" htmlFor="object-picker">Choose an object to explore</label>
-        <select id="object-picker" value={interaction.id || ''} onChange={e => handle.current?.select(e.target.value as ObjectId)}><option value="" disabled>Explore an object</option>{Object.entries(names).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
+        <select id="object-picker" value={interaction.id || ''} onChange={e => handle.current?.select(e.target.value as ObjectId)}><option value="" disabled>Explore an object</option>{Object.entries(names).filter(([id]) => id !== 'tools').map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
         {interaction.id && <><button className={rotateMode ? 'active' : ''} aria-pressed={rotateMode} onClick={() => setRotateMode(!rotateMode)}>{rotateMode ? 'Rotate' : 'Move'}</button><button onClick={() => handle.current?.rotate(0.26)} aria-label="Rotate selected object by fifteen degrees">↻</button><button onClick={() => handle.current?.reset()}>Reset object</button><button onClick={() => handle.current?.resetView()} aria-label="Exit object editing">×</button></>}
       </div>
       {props.editTarget === 'tangle' && <div className="tangle-edit-tip">Tangle · Drag a link to reshape it<button onClick={() => handle.current?.resetView()}>Done</button></div>}
