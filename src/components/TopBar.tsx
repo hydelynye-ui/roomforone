@@ -34,10 +34,10 @@ export const TopBar: React.FC<TopBarProps> = ({
   const temperature = roomState.actualWeather?.temperature;
   return (
     <header className="room-topbar">
-      <button className="room-brand" onClick={onToggleZenMode} title={zenMode ? 'Exit immersive view' : 'Enter immersive view'}>
+      <div className="room-brand">
         <span className="room-brand-symbol" />
         <span className="room-brand-name">roomforone</span>
-      </button>
+      </div>
       <div className="room-topbar-right">
         <button className="room-time-button" onClick={onOpenCityPicker} title="Change city">
           <span className="room-time-city">{roomState.city ? city.name : 'Choose your city'} <i>·</i> {timePhase}</span>
