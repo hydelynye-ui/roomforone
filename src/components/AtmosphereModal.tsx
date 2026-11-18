@@ -17,6 +17,7 @@ import { WeatherPreset, RoomState } from '../types';
 interface AtmosphereModalProps {
   roomState: RoomState;
   onSetWeather: (preset: WeatherPreset) => void;
+  onUseLiveWeather: () => void;
   onToggleWindow: () => void;
   onToggleLamp: () => void;
   onToggleMute: () => void;
@@ -27,6 +28,7 @@ interface AtmosphereModalProps {
 export const AtmosphereModal: React.FC<AtmosphereModalProps> = ({
   roomState,
   onSetWeather,
+  onUseLiveWeather,
   onToggleWindow,
   onToggleLamp,
   onToggleMute,
@@ -68,9 +70,10 @@ export const AtmosphereModal: React.FC<AtmosphereModalProps> = ({
         <div className="p-6 overflow-y-auto space-y-6">
           {/* Weather presets */}
           <div>
-            <label className="text-xs font-semibold text-[#34312E]/70 block mb-2.5 uppercase tracking-wider">
-              WEATHER PREVIEW
-            </label>
+            <div className="flex items-center justify-between gap-3 mb-2.5">
+              <label className="text-xs font-semibold text-[#34312E]/70 uppercase tracking-wider">WEATHER PREVIEW</label>
+              <button onClick={onUseLiveWeather} className={`text-[10px] font-semibold px-3 py-1.5 rounded-full border transition-colors ${roomState.weatherMode !== 'manual' ? 'bg-[#91A58C]/15 border-[#91A58C]/40 text-[#617A61]' : 'bg-white/60 border-[#C9A47E]/25 text-[#34312E]/60 hover:bg-white'}`}>Follow live weather</button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {presets.map((p) => {
                 const isActive = roomState.weather === p.id;
