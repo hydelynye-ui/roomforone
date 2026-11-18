@@ -5,9 +5,10 @@ import { CITY_OPTIONS, searchCities } from '../services/weatherService';
 
 interface CityPickerProps {
   onSelect: (city: CityConfig | null) => void;
+  onClose?: () => void;
 }
 
-export const CityPicker: React.FC<CityPickerProps> = ({ onSelect }) => {
+export const CityPicker: React.FC<CityPickerProps> = ({ onSelect, onClose }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CityConfig[]>(CITY_OPTIONS);
   const [loading, setLoading] = useState(false);
@@ -52,7 +53,7 @@ export const CityPicker: React.FC<CityPickerProps> = ({ onSelect }) => {
         <div className="city-picker-topline">
           <span className="city-picker-mark"><span /></span>
           <span>ROOMFORONE / YOUR ENVIRONMENT</span>
-          <button className="city-picker-close" onClick={() => onSelect(null)} aria-label="Close city selection"><X size={16} /></button>
+          <button className="city-picker-close" onClick={onClose ?? (() => onSelect(null))} aria-label="Close city selection"><X size={16} /></button>
         </div>
         <div className="city-picker-copy">
           <p className="eyebrow">A LITTLE SPACE TO SLOW DOWN</p>
