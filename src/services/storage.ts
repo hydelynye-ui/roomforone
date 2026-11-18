@@ -22,6 +22,8 @@ export const DEFAULT_ROOM_STATE: RoomState = {
   objectPoses: structuredClone(INITIAL_POSES),
   tangleNodes: initialTangle(),
   tangleNotes: [],
+  notesText: '',
+  movieEntries: [],
   gameHighScore: 0,
   weatherMode: 'live',
 };
@@ -64,6 +66,12 @@ export function normalizeRoomState(input: unknown): RoomState {
     objectPoses: poses, tangleNodes: nodes,
     tangleNotes: Array.isArray(p.tangleNotes) ? p.tangleNotes.filter((n): n is TangleNote =>
       !!n && typeof n.id === 'string' && typeof n.text === 'string' && Number.isFinite(n.createdAt)) : [],
+    notesText: typeof p.notesText === 'string' ? p.notesText.slice(0, 20000) : '',
+    movieEntries: Array.isArray(p.movieEntries) ? p.movieEntries.filter((entry) =>
+      !!entry && typeof entry.id === 'string' && typeof entry.title === 'string'
+      && typeof entry.note === 'string' && Number.isFinite(entry.createdAt)
+      && (entry.year === undefined || (Number.isInteger(entry.year) && entry.year >= 1888 && entry.year <= 2200)))
+      .slice(0, 200).map(entry => ({ ...entry, title: entry.title.slice(0, 120), note: entry.note.slice(0, 1200) })) : [],
     gameHighScore: finite(p.gameHighScore, 0, 0, 1e7),
     city: p.city && typeof p.city.id === 'string' && typeof p.city.name === 'string'
       && typeof p.city.country === 'string' && typeof p.city.timezone === 'string'
