@@ -70,12 +70,15 @@ export const App: React.FC = () => {
     if (!city) {
       weatherRequest.current++;
       setIsRefreshingWeather(false);
+      commit({ city: undefined, actualWeather: undefined, weatherMode: 'live' });
       setNotice('Demo environment · choose a city whenever you want to sync live weather.');
       return;
     }
+    const sameCity = stateRef.current.city?.id === city.id;
     weatherRequest.current++;
-    commit({ city, weatherMode: 'live', actualWeather: undefined });
-  }, [commit]);
+    commit({ city, weatherMode: 'live', actualWeather: sameCity ? stateRef.current.actualWeather : undefined });
+    if (sameCity) void refreshWeather(city);
+  }, [commit, refreshWeather]);
 
   useEffect(() => { audioEngine.update(roomState); }, [roomState.weather, roomState.windowOpen, roomState.audioTracks, roomState.masterVolume]);
   const soundPending = useRef(false);
@@ -138,7 +141,7 @@ export const App: React.FC = () => {
     <main className="workspace" inert={!!activeModal}>
       <Room3D state={roomState} timeOfDay={timeOfDay} blocked={!!activeModal} onSelectModal={setActiveModal} onToggleWindow={toggleWindow} onToggleLamp={toggleLamp} onPose={updatePose} onTangle={updateNodes} onRotation={updateRotation} />
     </main>
-    {showCityPicker && <CityPicker onSelect={handleSelectCity} />}
+    {showCityPicker && <CityPicker onSelect={handleSelectCity} onClose={() => setShowCityPicker(false)} />}
     {notice && <div role="status" className="room-notice">{notice}<button aria-label="Dismiss notice" onClick={() => setNotice('')}>×</button></div>}
     {activeModal && <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Room content panel" tabIndex={-1} data-modal-host>
       <Suspense fallback={<div className="modal-loading">Opening…<button onClick={close}>Return to room</button></div>}>
