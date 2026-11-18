@@ -74,8 +74,9 @@ export const App: React.FC = () => {
       setNotice('Demo environment · choose a city whenever you want to sync live weather.');
       return;
     }
-    commit({ city, weatherMode: 'live' });
-  }, [commit, refreshWeather]);
+    weatherRequest.current++;
+    commit({ city, weatherMode: 'live', actualWeather: undefined });
+  }, [commit]);
 
   useEffect(() => { audioEngine.update(roomState); }, [roomState.weather, roomState.windowOpen, roomState.audioTracks, roomState.masterVolume]);
   const soundPending = useRef(false);
