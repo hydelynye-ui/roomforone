@@ -84,6 +84,7 @@ export const App: React.FC = () => {
     finally { soundPending.current = false; }
   }, [commit]);
   const setWeather = useCallback((weather: WeatherPreset) => commit({ weather, weatherMode: 'manual' }), [commit]);
+  const handleUseLiveWeather = useCallback(() => commit(previous => ({ weatherMode: 'live', weather: previous.actualWeather?.preset ?? previous.weather })), [commit]);
   const toggleWindow = useCallback(() => commit(s => ({ windowOpen: !s.windowOpen })), [commit]);
   const toggleLamp = useCallback(() => commit(s => ({ lampOn: !s.lampOn })), [commit]);
   const updateLegacyVolume = useCallback((kind: 'weather' | 'ambient', value: number) => commit(s => kind === 'weather'
@@ -140,7 +141,7 @@ export const App: React.FC = () => {
         {activeModal === 'drawing' && <DrawingModal onClose={close} />}
         {activeModal === 'switch' && <SwitchPanel onClose={close} />}
         {activeModal === 'headphones' && <HeadphonesModal roomState={roomState} onToggleMute={toggleMute} onUpdateTrack={updateTrack} onMasterVolume={masterVolume => commit({ masterVolume })} onSetWeather={setWeather} onClose={close} />}
-        {activeModal === 'atmosphere' && <AtmosphereModal roomState={roomState} onSetWeather={setWeather} onToggleWindow={toggleWindow} onToggleLamp={toggleLamp} onToggleMute={toggleMute} onUpdateVolume={updateLegacyVolume} onClose={close} />}
+        {activeModal === 'atmosphere' && <AtmosphereModal roomState={roomState} onSetWeather={setWeather} onUseLiveWeather={handleUseLiveWeather} onToggleWindow={toggleWindow} onToggleLamp={toggleLamp} onToggleMute={toggleMute} onUpdateVolume={updateLegacyVolume} onClose={close} />}
       </Suspense>
     </div>}
   </div>;
