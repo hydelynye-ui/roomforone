@@ -441,6 +441,7 @@ export const Room3D: React.FC<Props> = props => {
       }
       const hour = live.current.timeOfDay;
       const isNight = s.weather === 'night' || hour < 5.5 || hour >= 20;
+      const daylight = clamp(Math.sin(((hour - 6) / 12) * Math.PI), 0, 1);
       const windSpeed = s.actualWeather?.windSpeed ?? (s.weather === 'autumn' ? 22 : 6);
       const cloudOpacity = ({ sunny: 0.42, cloudy: 0.92, rain: 0.96, snow: 0.86, autumn: 0.5, night: 0.58 } as const)[s.weather];
       cloudMaterial.opacity += (cloudOpacity - cloudMaterial.opacity) * alpha * 0.35;
@@ -461,7 +462,6 @@ export const Room3D: React.FC<Props> = props => {
         }
         outdoorLeafGeometry.attributes.position.needsUpdate = true;
       }
-      const daylight = clamp(Math.sin(((hour - 6) / 12) * Math.PI), 0, 1);
       const goldenHour = Math.max(clamp(1 - Math.abs(hour - 7) / 2.5, 0, 1), clamp(1 - Math.abs(hour - 18) / 3, 0, 1));
       const skyTarget = new THREE.Color(skies[s.weather]).lerp(new THREE.Color(0xE7B98E), goldenHour * (isNight ? 0 : 0.2)).lerp(new THREE.Color(0x263A4A), isNight ? 0.88 : 0);
       const backgroundTarget = new THREE.Color(backgrounds[s.weather]).lerp(new THREE.Color(0xE9C7A4), goldenHour * (isNight ? 0 : 0.12)).lerp(new THREE.Color(0x293A42), isNight ? 0.82 : 0);
