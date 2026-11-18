@@ -271,7 +271,7 @@ export const Room3D: React.FC<Props> = props => {
       rotate: delta => { if (!selected) return; const id = selected; poses[id] = constrainPose(id, { ...poses[id], rotation: poses[id].rotation + delta }, poses); groups[id].rotation.y = poses[id].rotation; commit(id); },
       move: (x, z) => { if (!selected) return; const id = selected; const p = poses[id]; poses[id] = constrainPose(id, { ...p, position: [p.position[0] + x, p.position[1], p.position[2] + z] }, poses); commit(id); },
       reset: () => { if (!selected) return; const id = selected; if (id === 'tangle') { nodes = initialTangle(); drawTangle(); live.current.onTangle(nodes); } else { poses[id] = structuredClone(INITIAL_POSES[id]); commit(id); } },
-      resetView: () => { selected = null; transition(null, 'idle'); resetFocus(); live.current.onEditEnd(); },
+      resetView: () => { selected = null; transition(null, 'idle'); resetFocus(); },
     };
 
     const ray = new THREE.Raycaster(), pointer = new THREE.Vector2(), plane = new THREE.Plane(up, -1.3);
