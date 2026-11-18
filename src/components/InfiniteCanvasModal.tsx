@@ -151,11 +151,11 @@ export const InfiniteCanvasModal: React.FC<Props> = ({ notes, onNotes, onClose }
     const link = document.createElement('a');
     link.download = `roomforone-canvas-${Date.now()}.png`;
     link.href = canvas.toDataURL('image/png');
-    link.click();
+    document.body.appendChild(link); link.click(); link.remove();
   };
 
   return (
-    <div className="infinite-canvas-overlay">
+    <div className="infinite-canvas-overlay" onClick={event => event.stopPropagation()}>
       <section className="infinite-canvas-shell" role="dialog" aria-modal="true" aria-label="Infinite Canvas">
         <header className="infinite-canvas-header">
           <div><span className="infinite-canvas-mark"><StickyNote size={16} /></span><div><strong>Infinite Canvas</strong><small>Draw, collect and connect ideas.</small></div></div>
