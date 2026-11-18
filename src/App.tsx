@@ -77,13 +77,6 @@ export const App: React.FC = () => {
     void refreshWeather(city);
   }, [commit, refreshWeather]);
 
-  const handleUseLiveWeather = useCallback(() => {
-    commit((previous) => ({
-      weatherMode: 'live',
-      weather: previous.actualWeather?.preset ?? previous.weather,
-    }));
-  }, [commit]);
-
   useEffect(() => { audioEngine.update(roomState); }, [roomState.weather, roomState.windowOpen, roomState.audioTracks, roomState.masterVolume]);
   const soundPending = useRef(false);
   const toggleMute = useCallback(async () => {
@@ -141,8 +134,6 @@ export const App: React.FC = () => {
   return <div className={'room-app' + (zenMode ? ' zen-mode' : '')}>
     <div inert={!!activeModal}><TopBar
       roomState={roomState}
-      onSetWeather={setWeather}
-      onUseLiveWeather={handleUseLiveWeather}
       onToggleMute={toggleMute}
       onOpenEnvironment={() => setActiveModal('atmosphere')}
       onOpenCityPicker={() => setShowCityPicker(true)}
