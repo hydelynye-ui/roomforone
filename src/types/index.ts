@@ -28,6 +28,7 @@ export interface ObjectPose { position: Vec3; rotation: number }
 export type AudioTrack = 'rain' | 'wind' | 'birds' | 'lofi';
 export type TrackMix = Record<AudioTrack, number>;
 export interface TangleNote { id: string; text: string; createdAt: number }
+export interface MovieEntry { id: string; title: string; year?: number; note: string; createdAt: number }
 
 export interface RoomState {
   weather: WeatherPreset;
@@ -43,6 +44,8 @@ export interface RoomState {
   objectPoses: Partial<Record<ObjectId, ObjectPose>>;
   tangleNodes: Vec3[];
   tangleNotes: TangleNote[];
+  notesText: string;
+  movieEntries: MovieEntry[];
   gameHighScore: number;
   city?: CityConfig;
   weatherMode?: 'live' | 'manual';
@@ -53,6 +56,7 @@ export type ModalType =
   | 'computer' 
   | 'drawing' 
   | 'game' 
+  | 'switch' 
   | 'diy' 
   | 'tangle'
   | 'headphones'
