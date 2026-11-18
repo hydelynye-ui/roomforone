@@ -2,10 +2,10 @@ import React from 'react';
 import { 
   X, 
   Sun, 
+  Cloud,
   CloudRain, 
   Snowflake, 
   Wind, 
-  Moon, 
   Volume2, 
   VolumeX, 
   Lightbulb, 
@@ -34,11 +34,11 @@ export const AtmosphereModal: React.FC<AtmosphereModalProps> = ({
   onClose,
 }) => {
   const presets: { id: WeatherPreset; label: string; desc: string; icon: React.ReactNode }[] = [
-    { id: 'sunny', label: '晴日下午', desc: '柔和日光斜射、轻柔鸟鸣与微风', icon: <Sun className="w-4 h-4 text-amber-500" /> },
-    { id: 'rain', label: '安静雨天', desc: '阴天与窗玻璃雨迹、低沉雨声', icon: <CloudRain className="w-4 h-4 text-blue-400" /> },
-    { id: 'snow', label: '冬日落雪', desc: '窗外漫天白雪、开窗有轻盈雪花', icon: <Snowflake className="w-4 h-4 text-sky-300" /> },
-    { id: 'autumn', label: '清爽秋日', desc: '金色夕照斜射、落叶飞舞沙沙声', icon: <Wind className="w-4 h-4 text-orange-400" /> },
-    { id: 'night', label: '暖灯夜晚', desc: '静谧夜色、台灯暖光与屏幕蓝晕', icon: <Moon className="w-4 h-4 text-indigo-400" /> },
+    { id: 'sunny', label: 'Clear', desc: 'Soft daylight, birdsong and a little breeze', icon: <Sun className="w-4 h-4 text-amber-500" /> },
+    { id: 'cloudy', label: 'Cloudy', desc: 'Quiet skies and softened daylight', icon: <Cloud className="w-4 h-4 text-slate-400" /> },
+    { id: 'rain', label: 'Rain', desc: 'Rain trails on the glass and distant showers', icon: <CloudRain className="w-4 h-4 text-blue-400" /> },
+    { id: 'snow', label: 'Snow', desc: 'Slow snowflakes and a pale winter sky', icon: <Snowflake className="w-4 h-4 text-sky-300" /> },
+    { id: 'autumn', label: 'Wind', desc: 'Warm light and a few drifting leaves', icon: <Wind className="w-4 h-4 text-orange-400" /> },
   ];
 
   return (
@@ -52,12 +52,12 @@ export const AtmosphereModal: React.FC<AtmosphereModalProps> = ({
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-[#C9A47E]" />
             <h3 className="text-sm font-bold text-[#34312E]">
-              空间氛围与环境音调节
+              Room environment
             </h3>
           </div>
           <button
             onClick={onClose}
-            aria-label="关闭氛围面板"
+            aria-label="Close environment settings"
             className="p-1.5 rounded-full hover:bg-[#EFE8DC] text-[#34312E]/70 hover:text-[#34312E] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -69,7 +69,7 @@ export const AtmosphereModal: React.FC<AtmosphereModalProps> = ({
           {/* Weather presets */}
           <div>
             <label className="text-xs font-semibold text-[#34312E]/70 block mb-2.5 uppercase tracking-wider">
-              天气预设 (Weather Presets)
+              WEATHER PREVIEW
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {presets.map((p) => {
@@ -98,7 +98,7 @@ export const AtmosphereModal: React.FC<AtmosphereModalProps> = ({
           {/* Room Switches (Window & Lamp) */}
           <div>
             <label className="text-xs font-semibold text-[#34312E]/70 block mb-2.5 uppercase tracking-wider">
-              房间互动开关
+              ROOM DETAILS
             </label>
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -111,10 +111,10 @@ export const AtmosphereModal: React.FC<AtmosphereModalProps> = ({
               >
                 <div className="flex items-center gap-2">
                   <Columns3 className="w-4 h-4 text-[#91A58C]" />
-                  <span className="text-xs font-semibold">窗户状态</span>
+                  <span className="text-xs font-semibold">Window</span>
                 </div>
                 <span className="text-[11px] px-2 py-0.5 rounded-md bg-[#FAF7F0] border border-[#C9A47E]/20 font-medium">
-                  {roomState.windowOpen ? '已打开' : '已关闭'}
+                  {roomState.windowOpen ? 'Open' : 'Closed'}
                 </span>
               </button>
 
@@ -128,15 +128,15 @@ export const AtmosphereModal: React.FC<AtmosphereModalProps> = ({
               >
                 <div className="flex items-center gap-2">
                   <Lightbulb className="w-4 h-4 text-amber-500" />
-                  <span className="text-xs font-semibold">台灯照明</span>
+                  <span className="text-xs font-semibold">Desk lamp</span>
                 </div>
                 <span className="text-[11px] px-2 py-0.5 rounded-md bg-[#FAF7F0] border border-[#C9A47E]/20 font-medium">
-                  {roomState.lampOn ? '亮起中' : '已熄灭'}
+                  {roomState.lampOn ? 'On' : 'Off'}
                 </span>
               </button>
             </div>
             <p className="text-[11px] text-[#34312E]/50 mt-1.5">
-              提示：窗户关闭时，外部天气声会自动衰减并滤波变闷；开窗时雨雪和风声更清透。
+              The open window lets outside sounds travel into the room. Closing it softens rain and wind.
             </p>
           </div>
 
@@ -145,7 +145,7 @@ export const AtmosphereModal: React.FC<AtmosphereModalProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-[#C98464]" />
-                <span className="text-xs font-bold text-[#34312E]">声音混音器</span>
+                <span className="text-xs font-bold text-[#34312E]">ROOM SOUND</span>
               </div>
               <button
                 onClick={onToggleMute}
@@ -156,14 +156,14 @@ export const AtmosphereModal: React.FC<AtmosphereModalProps> = ({
                 }`}
               >
                 {roomState.masterMute ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                <span>{roomState.masterMute ? '开启声音' : '静音总控'}</span>
+                <span>{roomState.masterMute ? 'Enable sound' : 'Mute all'}</span>
               </button>
             </div>
 
             <div className="space-y-3 pt-2">
               <div>
                 <div className="flex justify-between text-[11px] text-[#34312E]/80 mb-1">
-                  <span>天气声音量 (雨声/风声/落雪)</span>
+                  <span>Weather sounds</span>
                   <span>{Math.round(roomState.volumeWeather * 100)}%</span>
                 </div>
                 <input
@@ -180,7 +180,7 @@ export const AtmosphereModal: React.FC<AtmosphereModalProps> = ({
 
               <div>
                 <div className="flex justify-between text-[11px] text-[#34312E]/80 mb-1">
-                  <span>室内氛围音量 (鸟鸣/Lo-Fi底噪)</span>
+                  <span>Room sounds</span>
                   <span>{Math.round(roomState.volumeAmbient * 100)}%</span>
                 </div>
                 <input
